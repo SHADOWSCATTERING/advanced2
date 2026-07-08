@@ -22,12 +22,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv()  # must happen BEFORE importing src.ai_service, which reads ANTHROPIC_API_KEY at import time
 
-from flask import Flask, request, jsonify, make_response, session
+from flask import Flask, request, jsonify, make_response, session, redirect
 from werkzeug.security import generate_password_hash, check_password_hash
 import csv
 import io
+import secrets
+import requests
+import urllib.parse
 
-from src.database import get_connection, init_db, seed_from_csv, DB_PATH, db_session
+from src.database import get_connection, init_db, seed_from_csv, DB_PATH, db_session, migrate_google_columns
 from src.fatigue_engine import FatigueEngine
 from src.ai_service import explain_fatigue_risk, explain_conflict, is_ai_configured, chat_with_ai
 
@@ -36,12 +39,33 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(24).hex())
 app.permanent_session_lifetime = timedelta(days=7)
 
+# ---------------------------------------------------------------------
+# Google OAuth config (Sign in with Google + Sheets read access)
+# ---------------------------------------------------------------------
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
+GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:5000/api/auth/google/callback").strip()
+# The redirect target in the browser (your frontend) after the OAuth dance finishes.
+GOOGLE_POST_LOGIN_REDIRECT = os.environ.get("GOOGLE_POST_LOGIN_REDIRECT", "/").strip()
+GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
+GOOGLE_USERINFO_ENDPOINT = "https://www.googleapis.com/oauth2/v3/userinfo"
+# spreadsheets.readonly lets us read a user's private sheets once they've
+# consented; openid/email/profile are what identify who they are.
+GOOGLE_SCOPES = "openid email profile https://www.googleapis.com/auth/spreadsheets.readonly"
+
 # Initialize database on startup if running on Vercel
 if "VERCEL" in os.environ:
     if not os.path.exists(DB_PATH):
         print("Vercel environment detected. Initializing database in /tmp...")
         init_db(reset=True)
         seed_from_csv()
+
+# Always make sure the Google-auth columns exist, even on a database that
+# was created before this feature was added (existing installs upgrade
+# automatically on their next restart, no manual migration step needed).
+if os.path.exists(DB_PATH):
+    migrate_google_columns()
 
 # Enable simple CORS globally for local front-end testing
 @app.before_request
@@ -182,6 +206,165 @@ def reset_password():
         conn.execute("UPDATE users SET password_hash = ? WHERE email = ?", (password_hash, email))
         
     return jsonify({"message": "Password reset successful"})
+
+
+# ---------------------------------------------------------------------
+# Google OAuth ("Sign in with Google")
+# ---------------------------------------------------------------------
+@app.route("/api/auth/google/login", methods=["GET"])
+def google_login():
+    if not GOOGLE_CLIENT_ID:
+        return error_response(
+            "Google sign-in is not configured on the server (missing GOOGLE_CLIENT_ID).", 500
+        )
+
+    # CSRF protection: a random state we can verify on the way back.
+    state = secrets.token_urlsafe(24)
+    session["google_oauth_state"] = state
+
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope": GOOGLE_SCOPES,
+        "state": state,
+        "access_type": "offline",   # ask for a refresh_token
+        "prompt": "consent",        # force Google to actually hand one back every time
+        "include_granted_scopes": "true",
+    }
+    return redirect(f"{GOOGLE_AUTH_ENDPOINT}?{urllib.parse.urlencode(params)}")
+
+
+@app.route("/api/auth/google/callback", methods=["GET"])
+def google_callback():
+    error = request.args.get("error")
+    if error:
+        return redirect(f"{GOOGLE_POST_LOGIN_REDIRECT}?google_login=error&reason={urllib.parse.quote(error)}")
+
+    state = request.args.get("state")
+    if not state or state != session.pop("google_oauth_state", None):
+        return redirect(f"{GOOGLE_POST_LOGIN_REDIRECT}?google_login=error&reason=invalid_state")
+
+    code = request.args.get("code")
+    if not code:
+        return redirect(f"{GOOGLE_POST_LOGIN_REDIRECT}?google_login=error&reason=no_code")
+
+    try:
+        token_resp = requests.post(GOOGLE_TOKEN_ENDPOINT, data={
+            "code": code,
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "redirect_uri": GOOGLE_REDIRECT_URI,
+            "grant_type": "authorization_code",
+        })
+        token_resp.raise_for_status()
+        tokens = token_resp.json()
+
+        access_token = tokens["access_token"]
+        refresh_token = tokens.get("refresh_token")  # only present on first consent
+        expires_in = tokens.get("expires_in", 3600)
+        expiry = (datetime.now(timezone.utc) + timedelta(seconds=expires_in)).isoformat()
+
+        userinfo_resp = requests.get(
+            GOOGLE_USERINFO_ENDPOINT, headers={"Authorization": f"Bearer {access_token}"}
+        )
+        userinfo_resp.raise_for_status()
+        info = userinfo_resp.json()
+
+        email = info["email"].strip().lower()
+        google_id = info["sub"]
+        first_name = info.get("given_name", info.get("name", "Google")).strip()
+        last_name = info.get("family_name", "User").strip()
+
+        with db_session() as conn:
+            existing = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+            if existing:
+                # Keep existing refresh_token if Google didn't send a new one
+                # (it only sends one on the very first consent for this app).
+                if refresh_token:
+                    conn.execute(
+                        """UPDATE users SET auth_provider='google', google_id=?,
+                           google_access_token=?, google_refresh_token=?, google_token_expiry=?
+                           WHERE email=?""",
+                        (google_id, access_token, refresh_token, expiry, email),
+                    )
+                else:
+                    conn.execute(
+                        """UPDATE users SET auth_provider='google', google_id=?,
+                           google_access_token=?, google_token_expiry=?
+                           WHERE email=?""",
+                        (google_id, access_token, expiry, email),
+                    )
+            else:
+                # New account created via Google. password_hash/security fields
+                # are unusable placeholders since this user never sets a local
+                # password - they always sign in through Google.
+                placeholder_hash = generate_password_hash(secrets.token_urlsafe(32))
+                conn.execute(
+                    """INSERT INTO users
+                       (email, password_hash, first_name, last_name, security_question,
+                        security_answer_hash, auth_provider, google_id,
+                        google_access_token, google_refresh_token, google_token_expiry)
+                       VALUES (?, ?, ?, ?, ?, ?, 'google', ?, ?, ?, ?)""",
+                    (email, placeholder_hash, first_name, last_name,
+                     "N/A (Google account)", placeholder_hash,
+                     google_id, access_token, refresh_token, expiry),
+                )
+
+        session.permanent = True
+        session["user_email"] = email
+        return redirect(f"{GOOGLE_POST_LOGIN_REDIRECT}?google_login=success")
+
+    except Exception as exc:
+        return redirect(f"{GOOGLE_POST_LOGIN_REDIRECT}?google_login=error&reason={urllib.parse.quote(str(exc))}")
+
+
+def get_valid_google_token(email: str):
+    """Returns a fresh Google access token for this user, refreshing it via
+    their stored refresh_token if it's expired. Returns None if the user
+    never signed in with Google / has no usable token."""
+    with db_session() as conn:
+        user = conn.execute(
+            "SELECT google_access_token, google_refresh_token, google_token_expiry FROM users WHERE email = ?",
+            (email,),
+        ).fetchone()
+
+    if not user or not user["google_access_token"]:
+        return None
+
+    expiry = user["google_token_expiry"]
+    is_expired = True
+    if expiry:
+        try:
+            is_expired = datetime.now(timezone.utc) >= datetime.fromisoformat(expiry)
+        except ValueError:
+            is_expired = True
+
+    if not is_expired:
+        return user["google_access_token"]
+
+    if not user["google_refresh_token"]:
+        return None  # expired and nothing to refresh with
+
+    resp = requests.post(GOOGLE_TOKEN_ENDPOINT, data={
+        "client_id": GOOGLE_CLIENT_ID,
+        "client_secret": GOOGLE_CLIENT_SECRET,
+        "refresh_token": user["google_refresh_token"],
+        "grant_type": "refresh_token",
+    })
+    if not resp.ok:
+        return None
+
+    tokens = resp.json()
+    new_access_token = tokens["access_token"]
+    new_expiry = (datetime.now(timezone.utc) + timedelta(seconds=tokens.get("expires_in", 3600))).isoformat()
+
+    with db_session() as conn:
+        conn.execute(
+            "UPDATE users SET google_access_token = ?, google_token_expiry = ? WHERE email = ?",
+            (new_access_token, new_expiry, email),
+        )
+    return new_access_token
 
 
 # ---------------------------------------------------------------------
@@ -679,33 +862,237 @@ def admin_seed():
     return jsonify({"message": "Database initialized and seeded."})
 
 
+import re
+import uuid
+
+
+def _fetch_sheet_rows(sheet_id: str, owner: str):
+    """Fetch all rows (as list-of-dicts, keyed by header) from the first
+    tab of a Google Sheet. Prefers the signed-in user's own OAuth token
+    (works for private sheets they own or can view); falls back to a
+    server-wide API key (only works for sheets shared as "Anyone with the
+    link can view"). Returns (header, shifts) or raises ValueError with a
+    user-facing message."""
+    access_token = get_valid_google_token(owner)
+
+    if access_token:
+        headers = {"Authorization": f"Bearer {access_token}"}
+        params = ""
+    else:
+        api_key = os.environ.get("GOOGLE_SHEETS_API_KEY", "").strip()
+        if not api_key:
+            raise ValueError(
+                "No Google account is linked and no server API key is configured. "
+                "Sign in with Google, or set GOOGLE_SHEETS_API_KEY on the server."
+            )
+        headers = {}
+        params = f"?key={api_key}"
+
+    meta_url = f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}{params}"
+    meta_resp = requests.get(meta_url, headers=headers)
+    if meta_resp.status_code == 403:
+        raise ValueError(
+            "Permission denied. If you're not signed in with Google, the sheet must be "
+            "shared as 'Anyone with the link can view'. If you are signed in, make sure "
+            "this sheet is in your Google account."
+        )
+    elif meta_resp.status_code == 404:
+        raise ValueError("Spreadsheet not found. Please check the URL or ID.")
+    meta_resp.raise_for_status()
+
+    meta_data = meta_resp.json()
+    first_sheet_title = meta_data.get("sheets", [{}])[0].get("properties", {}).get("title")
+    if not first_sheet_title:
+        raise ValueError("Could not read any sheet tabs from that document.")
+
+    encoded_title = urllib.parse.quote(first_sheet_title)
+    values_url = f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{encoded_title}{params}"
+    values_resp = requests.get(values_url, headers=headers)
+    values_resp.raise_for_status()
+
+    rows = values_resp.json().get("values", [])
+    if not rows or len(rows) < 2:
+        raise ValueError("The spreadsheet is empty or has no data rows.")
+
+    header = [str(h).strip().lower() for h in rows[0]]
+    shifts = []
+    for row in rows[1:]:
+        padded_row = row + [""] * (len(header) - len(row))
+        shifts.append(dict(zip(header, padded_row)))
+
+    return first_sheet_title, shifts
+
+
+def _extract_sheet_id(raw: str) -> str:
+    raw = (raw or "").strip()
+    match = re.search(r"/d/([a-zA-Z0-9-_]+)", raw)
+    return match.group(1) if match else raw
+
+
+@app.route("/api/shifts/import-sheet", methods=["POST"])
+def import_sheet():
+    """One-off import: paste a sheet URL/ID and pull its rows in immediately.
+    Does NOT remember the sheet for auto-sync - use /api/sheets/link for that."""
+    owner = get_owner()
+    if not owner or owner == "demo":
+        return error_response("Please log in to import from Google Sheets.", 401)
+
+    payload = request.get_json(force=True, silent=True) or {}
+    sheet_id = _extract_sheet_id(payload.get("sheet_id", ""))
+    if not sheet_id:
+        return error_response("No Google Sheets URL or ID provided.")
+
+    try:
+        _sheet_title, shifts = _fetch_sheet_rows(sheet_id, owner)
+        return _process_shifts_data(shifts, owner)
+    except ValueError as ve:
+        return error_response(str(ve))
+    except requests.exceptions.HTTPError as he:
+        return error_response(f"Google Sheets API Error ({he.response.status_code}): {he.response.text}")
+    except Exception as exc:
+        return error_response(f"Failed to import Google Sheet: {exc}")
+
+
+@app.route("/api/sheets/link", methods=["POST"])
+def link_sheet():
+    """Remember a spreadsheet against the logged-in user's account and do
+    an immediate first sync. The frontend then polls /api/sheets/sync
+    periodically to pick up any edits made in the sheet afterwards."""
+    owner = get_owner()
+    if not owner or owner == "demo":
+        return error_response("Please log in to link a Google Sheet.", 401)
+
+    payload = request.get_json(force=True, silent=True) or {}
+    sheet_id = _extract_sheet_id(payload.get("sheet_id", ""))
+    if not sheet_id:
+        return error_response("No Google Sheets URL or ID provided.")
+
+    try:
+        sheet_title, shifts = _fetch_sheet_rows(sheet_id, owner)
+    except ValueError as ve:
+        return error_response(str(ve))
+    except requests.exceptions.HTTPError as he:
+        return error_response(f"Google Sheets API Error ({he.response.status_code}): {he.response.text}")
+    except Exception as exc:
+        return error_response(f"Failed to link Google Sheet: {exc}")
+
+    result = _process_shifts_data(shifts, owner)
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    with db_session() as conn:
+        conn.execute(
+            "UPDATE users SET linked_sheet_id = ?, linked_sheet_name = ?, linked_sheet_last_synced = ? WHERE email = ?",
+            (sheet_id, sheet_title, now_iso, owner),
+        )
+
+    if isinstance(result, tuple):
+        body, status = result
+        data = body.get_json()
+    else:
+        data = result.get_json()
+    data["linked_sheet_id"] = sheet_id
+    data["linked_sheet_name"] = sheet_title
+    data["last_synced"] = now_iso
+    return jsonify(data)
+
+
+@app.route("/api/sheets/sync", methods=["POST"])
+def sync_linked_sheet():
+    """Re-fetch the user's already-linked sheet and pull in any changes.
+    Meant to be called on page load and on a timer from the frontend."""
+    owner = get_owner()
+    if not owner or owner == "demo":
+        return error_response("Please log in.", 401)
+
+    with db_session() as conn:
+        user = conn.execute("SELECT linked_sheet_id, linked_sheet_name FROM users WHERE email = ?", (owner,)).fetchone()
+
+    if not user or not user["linked_sheet_id"]:
+        return error_response("No Google Sheet is linked to this account yet.", 400)
+
+    sheet_id = user["linked_sheet_id"]
+    try:
+        sheet_title, shifts = _fetch_sheet_rows(sheet_id, owner)
+    except ValueError as ve:
+        return error_response(str(ve))
+    except requests.exceptions.HTTPError as he:
+        return error_response(f"Google Sheets API Error ({he.response.status_code}): {he.response.text}")
+    except Exception as exc:
+        return error_response(f"Failed to sync Google Sheet: {exc}")
+
+    result = _process_shifts_data(shifts, owner)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    with db_session() as conn:
+        conn.execute("UPDATE users SET linked_sheet_last_synced = ? WHERE email = ?", (now_iso, owner))
+
+    if isinstance(result, tuple):
+        body, status = result
+        data = body.get_json()
+    else:
+        data = result.get_json()
+    data["linked_sheet_id"] = sheet_id
+    data["linked_sheet_name"] = sheet_title
+    data["last_synced"] = now_iso
+    return jsonify(data)
+
+
+@app.route("/api/sheets/unlink", methods=["POST"])
+def unlink_sheet():
+    owner = get_owner()
+    if not owner or owner == "demo":
+        return error_response("Please log in.", 401)
+    with db_session() as conn:
+        conn.execute(
+            "UPDATE users SET linked_sheet_id = NULL, linked_sheet_name = NULL, linked_sheet_last_synced = NULL WHERE email = ?",
+            (owner,),
+        )
+    return jsonify({"message": "Sheet unlinked."})
+
+
+@app.route("/api/sheets/status", methods=["GET"])
+def sheet_status():
+    owner = get_owner()
+    if not owner or owner == "demo":
+        return jsonify({"linked": False})
+    with db_session() as conn:
+        user = conn.execute(
+            "SELECT linked_sheet_id, linked_sheet_name, linked_sheet_last_synced, auth_provider FROM users WHERE email = ?",
+            (owner,),
+        ).fetchone()
+    if not user or not user["linked_sheet_id"]:
+        return jsonify({"linked": False, "auth_provider": user["auth_provider"] if user else None})
+    return jsonify({
+        "linked": True,
+        "sheet_id": user["linked_sheet_id"],
+        "sheet_name": user["linked_sheet_name"],
+        "last_synced": user["linked_sheet_last_synced"],
+        "auth_provider": user["auth_provider"],
+    })
+
+
 @app.route("/api/upload-csv", methods=["POST"])
 def upload_csv():
     owner = get_owner()
     if not owner or owner == "demo":
         return error_response("Please log in to upload a CSV.", 401)
-    
+
     if "file" not in request.files:
         return error_response("No file uploaded.")
-    
+
     file = request.files["file"]
     if file.filename == "":
         return error_response("No file selected.")
-        
+
     try:
         stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
         reader = csv.DictReader(stream)
         shifts = list(reader)
-        
+
         return _process_shifts_data(shifts, owner)
-        
+
     except Exception as exc:
         return error_response(f"Failed to parse CSV: {exc}")
 
-
-@app.errorhandler(404)
-def not_found(e):
-    return error_response("Endpoint not found", 404)
 
 def _process_shifts_data(shifts, owner):
     employees_created = 0
@@ -724,9 +1111,8 @@ def _process_shifts_data(shifts, owner):
                     (emp_id, owner, f"User {emp_id}", "Staff", s.get("department", "General"))
                 )
                 employees_created += 1
-            
+
             # insert shift
-            import uuid
             shift_id = s.get("shift_id") or f"S_{uuid.uuid4().hex[:8]}"
             conn.execute(
                 """INSERT OR REPLACE INTO shifts (shift_id, owner_email, employee_id, shift_date, shift_type, start_time, end_time, location, department)
@@ -740,67 +1126,9 @@ def _process_shifts_data(shifts, owner):
         return error_response(f"Database error during import: {exc}")
     finally:
         conn.close()
-        
+
     return jsonify({"message": f"Successfully processed {shifts_inserted} shifts. Created {employees_created} new employees."})
 
-
-@app.route("/api/shifts/import-sheet", methods=["POST"])
-def import_sheet():
-    owner = get_owner()
-    if not owner or owner == "demo":
-        return error_response("Please log in to import from Google Sheets.", 401)
-        
-    payload = request.get_json(force=True, silent=True) or {}
-    sheet_input = payload.get("sheet_id")
-    if not sheet_input:
-        return error_response("sheet_id is required")
-        
-    # Extract ID if URL is provided
-    import re
-    match = re.search(r"/d/([a-zA-Z0-9-_]+)", sheet_input)
-    sheet_id = match.group(1) if match else sheet_input.strip()
-    
-    api_key = os.environ.get("GOOGLE_SHEETS_API_KEY")
-    if not api_key:
-        return error_response("Google Sheets integration is not configured", 500)
-        
-    try:
-        # First, fetch the spreadsheet metadata to get the first sheet's name
-        meta_url = f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}?key={api_key}"
-        meta_res = requests.get(meta_url)
-        if not meta_res.ok:
-            return error_response("Failed to fetch spreadsheet. Ensure it is public ('Anyone with the link can view').", 400)
-            
-        meta_data = meta_res.json()
-        if not meta_data.get("sheets"):
-            return error_response("Spreadsheet is empty or invalid.", 400)
-            
-        first_sheet_name = meta_data["sheets"][0]["properties"]["title"]
-        
-        # Now fetch the values
-        values_url = f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{first_sheet_name}?key={api_key}"
-        values_res = requests.get(values_url)
-        if not values_res.ok:
-            return error_response("Failed to fetch sheet data.", 400)
-            
-        values_data = values_res.json()
-        rows = values_data.get("values", [])
-        if not rows or len(rows) < 2:
-            return error_response("Sheet is empty or has no data rows.")
-            
-        headers = rows[0]
-        shifts = []
-        for row in rows[1:]:
-            # Map row to dictionary based on headers
-            shift_dict = {}
-            for i, val in enumerate(row):
-                if i < len(headers):
-                    shift_dict[headers[i]] = val
-            shifts.append(shift_dict)
-            
-        return _process_shifts_data(shifts, owner)
-    except Exception as exc:
-        return error_response(f"Error communicating with Google Sheets API: {exc}", 500)
 
 
 @app.errorhandler(404)

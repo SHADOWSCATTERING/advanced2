@@ -223,12 +223,39 @@
                                 </form>
                                 <form id="sheet-form" style="display: flex; flex-direction: column; gap: 0.8rem; margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1rem;">
                                     <div class="form-group" style="margin: 0;">
-                                        <label for="sheet-url" style="font-size: 0.85rem; margin-bottom: 0.3rem;">Import from Google Sheets</label>
+                                        <label for="sheet-url" style="font-size: 0.85rem; margin-bottom: 0.3rem;">One-off import from Google Sheets</label>
                                         <input type="text" id="sheet-url" placeholder="Paste Sheet URL or ID" required class="form-control" style="width: 100%; padding: 0.5rem;">
                                     </div>
                                     <button type="submit" class="btn btn-primary" style="width: 100%;">Import Sheet</button>
                                 </form>
                                 <div id="upload-status" style="margin-top: 0.8rem; font-size: 0.85rem; text-align: center;"></div>
+
+                                <!-- Linked Sheet / Auto-Sync -->
+                                <div id="linked-sheet-section" style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1rem;">
+                                    <label style="font-size: 0.85rem; margin-bottom: 0.3rem; display: block;">Auto-sync a Google Sheet</label>
+
+                                    <div id="linked-sheet-empty">
+                                        <p style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 0.6rem;">Link a sheet once and it'll refresh here automatically whenever it changes.</p>
+                                        <form id="link-sheet-form" style="display: flex; flex-direction: column; gap: 0.6rem;">
+                                            <input type="text" id="link-sheet-url" placeholder="Paste Sheet URL or ID" required class="form-control" style="width: 100%; padding: 0.5rem;">
+                                            <button type="submit" class="btn btn-secondary" style="width: 100%;">Connect Sheet</button>
+                                        </form>
+                                    </div>
+
+                                    <div id="linked-sheet-active" class="hidden">
+                                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: var(--border-radius); padding: 0.6rem 0.8rem;">
+                                            <div style="min-width: 0;">
+                                                <div style="font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="linked-sheet-name">—</div>
+                                                <div style="font-size: 0.75rem; color: var(--text-secondary);">Last synced: <span id="linked-sheet-last-synced">never</span></div>
+                                            </div>
+                                            <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--accent-green); flex-shrink: 0;" title="Auto-sync active"></span>
+                                        </div>
+                                        <div style="display: flex; gap: 0.5rem; margin-top: 0.6rem;">
+                                            <button id="btn-sync-now" type="button" class="btn btn-secondary btn-sm" style="flex: 1;">Sync Now</button>
+                                            <button id="btn-unlink-sheet" type="button" class="btn btn-secondary btn-sm" style="flex: 1;">Unlink</button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -632,6 +659,20 @@
 
                 <!-- Log In Form -->
                 <form id="login-form" style="display: flex; flex-direction: column; gap: 0.8rem;">
+                    <button type="button" id="btn-google-login" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 0.6rem; background: #fff; color: #3c4043; border: 1px solid rgba(0,0,0,0.15); border-radius: var(--border-radius); font-size: 0.9rem; font-weight: 500; cursor: pointer;">
+                        <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+                            <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.5 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.2-.1-2.4-.4-3.5z"/>
+                            <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.1 8 3l6-6C34.5 5.1 29.5 3 24 3c-7.7 0-14.3 4.4-17.7 10.7z"/>
+                            <path fill="#4CAF50" d="M24 45c5.4 0 10.3-1.8 14.1-4.9l-6.5-5.5C29.5 36.4 26.9 37 24 37c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.6 40.5 16.3 45 24 45z"/>
+                            <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.7l6.5 5.5C40.9 36.5 44 30.9 44 24c0-1.2-.1-2.4-.4-3.5z"/>
+                        </svg>
+                        Sign in with Google
+                    </button>
+                    <div style="display: flex; align-items: center; gap: 0.8rem; margin: 0.2rem 0;">
+                        <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.08);"></div>
+                        <span style="font-size: 0.75rem; color: var(--text-secondary);">or</span>
+                        <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.08);"></div>
+                    </div>
                     <input type="email" id="login-email" placeholder="Email" required class="form-control" style="width: 100%;">
                     <input type="password" id="login-password" placeholder="Password" required class="form-control" style="width: 100%;">
                     <button type="submit" class="btn btn-primary" style="width: 100%;">Log In</button>

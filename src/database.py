@@ -92,6 +92,22 @@ CREATE INDEX IF NOT EXISTS idx_availability_employee_date ON availability(employ
 CREATE INDEX IF NOT EXISTS idx_subj_fatigue_employee_date ON subjective_fatigue(employee_id, report_date);
 """
 
+# Columns added later for "Sign in with Google" + Google Sheets auto-sync.
+# Kept separate (rather than baked into SCHEMA above) and applied via
+# ALTER TABLE in migrate_google_columns() so an existing shift_planning.db
+# created by an older version of this schema upgrades automatically on the
+# next startup, instead of needing a full reset.
+GOOGLE_AUTH_COLUMNS = [
+    ("auth_provider",            "TEXT DEFAULT 'local'"),
+    ("google_id",                "TEXT"),
+    ("google_access_token",      "TEXT"),
+    ("google_refresh_token",     "TEXT"),
+    ("google_token_expiry",      "TEXT"),   # ISO 8601 UTC timestamp
+    ("linked_sheet_id",          "TEXT"),
+    ("linked_sheet_name",        "TEXT"),
+    ("linked_sheet_last_synced", "TEXT"),   # ISO 8601 UTC timestamp
+]
+
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
@@ -115,12 +131,29 @@ def db_session():
         conn.close()
 
 
+def migrate_google_columns():
+    """Idempotently add the Google-auth / sheet-sync columns to `users` if
+    they don't already exist. Safe to call on every startup.
+
+    Also re-runs the base CREATE TABLE IF NOT EXISTS statements first, since
+    some older shift_planning.db files out there predate the `users` table
+    entirely (it was added after employees/shifts/etc.) - without this, a
+    fresh ALTER TABLE on a DB missing `users` altogether would just error."""
+    with db_session() as conn:
+        conn.executescript(SCHEMA)  # no-op for tables that already exist
+        existing = {row["name"] for row in conn.execute("PRAGMA table_info(users)")}
+        for col_name, col_def in GOOGLE_AUTH_COLUMNS:
+            if col_name not in existing:
+                conn.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}")
+
+
 def init_db(reset: bool = False):
     """Create tables. If reset=True, drops and recreates everything."""
     if reset and os.path.exists(DB_PATH):
         os.remove(DB_PATH)
     with db_session() as conn:
         conn.executescript(SCHEMA)
+    migrate_google_columns()
     print(f"Database initialized at {DB_PATH}")
 
 

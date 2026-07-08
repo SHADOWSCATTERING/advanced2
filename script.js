@@ -148,6 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateAuthUI();
             closeModal();
             if (typeof loadEmployees === 'function') loadEmployees();
+            refreshSheetStatus();
         } catch (err) {
             showAuthMsg(err.message, true);
         }
@@ -234,6 +235,8 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.removeItem('fatiguex_user_email');
             updateAuthUI();
             closeModal();
+            stopSheetPolling();
+            showLinkedSheetUI(null);
             if (typeof loadEmployees === 'function') loadEmployees();
         });
     }
@@ -270,6 +273,124 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- Sign in with Google ---
+    document.getElementById('btn-google-login')?.addEventListener('click', () => {
+        window.location.href = '/api/auth/google/login';
+    });
+
+    // --- Linked Sheet Auto-Sync ---
+    const linkedSheetEmpty = document.getElementById('linked-sheet-empty');
+    const linkedSheetActive = document.getElementById('linked-sheet-active');
+    const linkedSheetName = document.getElementById('linked-sheet-name');
+    const linkedSheetLastSynced = document.getElementById('linked-sheet-last-synced');
+    let sheetPollTimer = null;
+
+    function formatSyncTime(iso) {
+        if (!iso) return 'never';
+        try {
+            return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        } catch (e) {
+            return iso;
+        }
+    }
+
+    function showLinkedSheetUI(status) {
+        if (status && status.linked) {
+            linkedSheetEmpty?.classList.add('hidden');
+            linkedSheetActive?.classList.remove('hidden');
+            if (linkedSheetName) linkedSheetName.textContent = status.sheet_name || status.sheet_id;
+            if (linkedSheetLastSynced) linkedSheetLastSynced.textContent = formatSyncTime(status.last_synced);
+        } else {
+            linkedSheetEmpty?.classList.remove('hidden');
+            linkedSheetActive?.classList.add('hidden');
+        }
+    }
+
+    function stopSheetPolling() {
+        if (sheetPollTimer) {
+            clearInterval(sheetPollTimer);
+            sheetPollTimer = null;
+        }
+    }
+
+    async function syncLinkedSheetSilently() {
+        try {
+            const res = await window.fetch('/api/sheets/sync', { method: 'POST' });
+            if (!res.ok) return; // e.g. nothing linked yet, or a transient error - stay quiet
+            const data = await res.json();
+            if (linkedSheetLastSynced) linkedSheetLastSynced.textContent = formatSyncTime(data.last_synced);
+            if (typeof loadEmployees === 'function') loadEmployees();
+        } catch (e) {
+            // Silent by design - this runs on a background timer.
+        }
+    }
+
+    function startSheetPolling() {
+        stopSheetPolling();
+        // Refresh on load, then keep polling every 2 minutes while the tab is open.
+        syncLinkedSheetSilently();
+        sheetPollTimer = setInterval(syncLinkedSheetSilently, 2 * 60 * 1000);
+    }
+
+    async function refreshSheetStatus() {
+        if (!currentUserEmail) { showLinkedSheetUI(null); stopSheetPolling(); return; }
+        try {
+            const res = await window.fetch('/api/sheets/status');
+            const data = await res.json();
+            showLinkedSheetUI(data);
+            if (data.linked) startSheetPolling(); else stopSheetPolling();
+        } catch (e) {
+            console.error('Could not load sheet status', e);
+        }
+    }
+
+    document.getElementById('link-sheet-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const url = document.getElementById('link-sheet-url').value.trim();
+        if (!url) return;
+        if (uploadStatus) { uploadStatus.textContent = 'Connecting sheet...'; uploadStatus.style.color = 'var(--text-secondary)'; }
+        try {
+            const res = await window.fetch('/api/sheets/link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sheet_id: url })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to link sheet');
+            if (uploadStatus) { uploadStatus.textContent = 'Connected! ' + (data.message || ''); uploadStatus.style.color = 'var(--accent-green)'; }
+            document.getElementById('link-sheet-url').value = '';
+            showLinkedSheetUI({ linked: true, sheet_id: data.linked_sheet_id, sheet_name: data.linked_sheet_name, last_synced: data.last_synced });
+            startSheetPolling();
+            if (typeof loadEmployees === 'function') loadEmployees();
+        } catch (err) {
+            if (uploadStatus) { uploadStatus.textContent = 'Error: ' + err.message; uploadStatus.style.color = 'var(--accent-red)'; }
+        }
+    });
+
+    document.getElementById('btn-sync-now')?.addEventListener('click', async () => {
+        if (uploadStatus) { uploadStatus.textContent = 'Syncing...'; uploadStatus.style.color = 'var(--text-secondary)'; }
+        try {
+            const res = await window.fetch('/api/sheets/sync', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Sync failed');
+            if (uploadStatus) { uploadStatus.textContent = 'Synced! ' + (data.message || ''); uploadStatus.style.color = 'var(--accent-green)'; }
+            if (linkedSheetLastSynced) linkedSheetLastSynced.textContent = formatSyncTime(data.last_synced);
+            if (typeof loadEmployees === 'function') loadEmployees();
+        } catch (err) {
+            if (uploadStatus) { uploadStatus.textContent = 'Error: ' + err.message; uploadStatus.style.color = 'var(--accent-red)'; }
+        }
+    });
+
+    document.getElementById('btn-unlink-sheet')?.addEventListener('click', async () => {
+        try {
+            await window.fetch('/api/sheets/unlink', { method: 'POST' });
+            showLinkedSheetUI(null);
+            stopSheetPolling();
+        } catch (err) {
+            console.error('Failed to unlink sheet', err);
+        }
+    });
+
     document.getElementById('sheet-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const sheetUrl = document.getElementById('sheet-url').value.trim();
@@ -304,8 +425,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
+    // Handle the redirect back from /api/auth/google/callback
+    function handleGoogleLoginRedirect() {
+        const params = new URLSearchParams(window.location.search);
+        const status = params.get('google_login');
+        if (!status) return;
+
+        if (status === 'success') {
+            showAuthMsg('Signed in with Google!', false);
+        } else if (status === 'error') {
+            openModal();
+            showAuthMsg('Google sign-in failed: ' + (params.get('reason') || 'unknown error'), true);
+        }
+        // Clean the query params out of the URL without reloading the page.
+        params.delete('google_login');
+        params.delete('reason');
+        const cleanUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+        window.history.replaceState({}, document.title, cleanUrl);
+    }
+
     // Initialize Auth UI & Verify Session
     async function initSession() {
+        handleGoogleLoginRedirect();
         try {
             const res = await window.fetch('/api/auth/session');
             if (res.ok) {
@@ -325,6 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("Session check failed", e);
         }
         updateAuthUI();
+        refreshSheetStatus();
     }
     
     initSession();

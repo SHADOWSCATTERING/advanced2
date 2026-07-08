@@ -169,6 +169,22 @@ def check_session():
         return jsonify({"valid": True, "email": session["user_email"]})
     return jsonify({"valid": False}), 401
 
+import time
+from collections import defaultdict
+
+# Simple rate limiter for password recovery (in-memory)
+recovery_attempts = defaultdict(list)
+MAX_ATTEMPTS = 5
+COOLDOWN_SECONDS = 900 # 15 minutes
+
+def is_rate_limited(email):
+    now = time.time()
+    # Clean up old attempts
+    recovery_attempts[email] = [t for t in recovery_attempts[email] if now - t < COOLDOWN_SECONDS]
+    if len(recovery_attempts[email]) >= MAX_ATTEMPTS:
+        return True
+    recovery_attempts[email].append(now)
+    return False
 
 @app.route("/api/auth/forgot-password", methods=["POST"])
 def forgot_password():
@@ -178,10 +194,14 @@ def forgot_password():
         return error_response(err)
         
     email = payload["email"].strip().lower()
+    
+    if is_rate_limited(email):
+        return error_response("Too many attempts. Please try again later.", 429)
+        
     with db_session() as conn:
         user = conn.execute("SELECT security_question FROM users WHERE email = ?", (email,)).fetchone()
         # Always return generic response to prevent enumeration
-        question = user["security_question"] if user else "What was your first pet's name?"
+        question = user["security_question"] if user else "What was the name of your first pet?"
         return jsonify({"security_question": question})
 
 
@@ -194,13 +214,18 @@ def reset_password():
         
     email = payload["email"].strip().lower()
     password = payload["new_password"]
+    
+    if is_rate_limited(email):
+        return error_response("Too many attempts. Please try again later.", 429)
+        
     if len(password) < 8 or not any(char.isdigit() for char in password):
         return error_response("Password must be at least 8 characters and contain at least one number")
 
     with db_session() as conn:
         user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
         if not user or not check_password_hash(user["security_answer_hash"], payload["security_answer"].strip().lower()):
-            return error_response("Invalid security answer or email", 401)
+            # Important: We don't reveal if the email exists, just a generic invalid error.
+            return error_response("Incorrect answer", 401)
             
         password_hash = generate_password_hash(password)
         conn.execute("UPDATE users SET password_hash = ? WHERE email = ?", (password_hash, email))
@@ -848,18 +873,6 @@ def daily_email_report():
 
     return jsonify({"message": "Daily email processed", "status": "ok"})
 
-
-# ---------------------------------------------------------------------
-# Admin / DB
-# ---------------------------------------------------------------------
-@app.route("/api/admin/seed", methods=["POST"])
-def admin_seed():
-    """Convenience endpoint to (re)initialize and seed the database from
-    the starter CSVs in data/. Intended for local dev/demo use only."""
-    reset = bool((request.get_json(silent=True) or {}).get("reset", True))
-    init_db(reset=reset)
-    seed_from_csv()
-    return jsonify({"message": "Database initialized and seeded."})
 
 
 import re

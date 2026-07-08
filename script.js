@@ -129,6 +129,19 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('link-back-login-1')?.addEventListener('click', (e) => { e.preventDefault(); showAuthForm('login-form'); });
     document.getElementById('link-back-login-2')?.addEventListener('click', (e) => { e.preventDefault(); showAuthForm('login-form'); });
 
+    // Handle Google Sign-in URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('google_login') === 'error') {
+        const reason = urlParams.get('reason') || 'Unknown error';
+        openModal();
+        showAuthForm('login-form');
+        showAuthMsg(`Google Sign-In failed: ${reason}`, true);
+        window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (urlParams.get('google_login') === 'success') {
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+
     // API Handlers
     document.getElementById('login-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -645,7 +658,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const dbStatusText = document.getElementById('db-status-text');
     const aiStatusDot = document.getElementById('ai-status-dot');
     const aiStatusText = document.getElementById('ai-status-text');
-    const btnSeedDb = document.getElementById('btn-seed-db');
     const btnGenerateSchedule = document.getElementById('btn-generate-schedule');
 
     const generateModal = document.getElementById('generate-modal');
@@ -758,13 +770,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.database_initialized) {
                 dbStatusDot.className = 'status-dot active';
                 dbStatusText.textContent = 'Initialized (Seeded)';
-                btnSeedDb.textContent = 'Reset & Reseed';
-                btnSeedDb.className = 'btn btn-secondary btn-sm';
             } else {
                 dbStatusDot.className = 'status-dot inactive';
                 dbStatusText.textContent = 'Missing Database';
-                btnSeedDb.textContent = 'Setup Database';
-                btnSeedDb.className = 'btn btn-primary btn-sm';
             }
 
             // Render AI status
@@ -1350,58 +1358,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 6. DB Administration Actions (Seed/Reset)
-    async function seedDatabase() {
-        const confirmMsg = dbStatusText.textContent.includes('Missing')
-            ? "This will initialize the database schema and load starter rosters. Proceed?"
-            : "⚠️ Warning: This will delete all current schedules and restore the database to its starter seeding state. Proceed?";
-        
-        if (!confirm(confirmMsg)) return;
-
-        btnSeedDb.disabled = true;
-        btnSeedDb.textContent = 'Seeding...';
-
-        try {
-            const res = await fetch(`${API_BASE}/api/admin/seed`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reset: true })
-            });
-
-            const data = await res.json();
-            btnSeedDb.disabled = false;
-
-            if (!res.ok) {
-                alert(`Failed to seed database: ${data.error || 'Unknown error'}`);
-                return;
-            }
-
-            alert("🟢 Database initialized and seeded successfully!");
-            
-            // Reload app state
-            const initialized = await checkHealth();
-            if (initialized) {
-                await loadEmployees();
-                // Deselect current employee since roster reset
-                selectedEmpId = null;
-                panelDetailsContent.classList.add('hidden');
-                panelEmptyState.classList.remove('hidden');
-            }
-
-        } catch (err) {
-            console.error(err);
-            btnSeedDb.disabled = false;
-            btnSeedDb.textContent = 'Seed/Reset Data';
-            alert("Connection error occurred. Could not seed database.");
-        }
-    }
-
     // 7. Event Listeners
     employeeSearchInput.addEventListener('keyup', () => {
         renderEmployeeList();
     });
 
-    btnSeedDb.addEventListener('click', seedDatabase);
     btnValidateShift.addEventListener('click', validateShift);
     shiftAssignmentForm.addEventListener('submit', assignShift);
     if (restDayForm) {

@@ -174,8 +174,6 @@
                     </div>
                     <div class="status-actions">
                         <button class="btn btn-primary btn-sm" id="btn-generate-schedule" style="padding: 0.5rem 1.2rem; font-size: 0.85rem; margin-right: 10px;">Auto-Generate Schedule</button>
-                        <a href="/api/reports/compliance" target="_blank" class="btn btn-secondary btn-sm" style="padding: 0.5rem 1.2rem; font-size: 0.85rem; margin-right: 10px; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-primary); transition: all 0.3s ease;">Export Compliance (CSV)</a>
-                        <button class="btn btn-secondary btn-sm" id="btn-seed-db" style="padding: 0.5rem 1.2rem; font-size: 0.85rem;">Seed/Reset Data</button>
                     </div>
                 </div>
 
@@ -689,9 +687,13 @@
                     <input type="password" id="register-password" placeholder="Password (min 8 chars, 1 number)" required class="form-control" style="width: 100%;">
                     <select id="register-sq" required class="form-control" style="width: 100%;">
                         <option value="" disabled selected>Select a Security Question</option>
-                        <option value="What was your first pet's name?">What was your first pet's name?</option>
-                        <option value="What city were you born in?">What city were you born in?</option>
+                        <option value="What was the name of your first pet?">What was the name of your first pet?</option>
                         <option value="What is your mother's maiden name?">What is your mother's maiden name?</option>
+                        <option value="What was your first school's name?">What was your first school's name?</option>
+                        <option value="What city were you born in?">What city were you born in?</option>
+                        <option value="What is your favorite teacher's name?">What is your favorite teacher's name?</option>
+                        <option value="What was your childhood nickname?">What was your childhood nickname?</option>
+                        <option value="What was your dream job as a child?">What was your dream job as a child?</option>
                     </select>
                     <input type="text" id="register-sa" placeholder="Security Answer" required class="form-control" style="width: 100%;">
                     <button type="submit" class="btn btn-primary" style="width: 100%;">Register</button>

@@ -1,0 +1,11 @@
+employee_id,name,role,department,employment_type,max_weekly_hours,contracted_hours,experience_years,min_rest_hours_required
+E001,Jane Smith (Low Risk),Senior Nurse,Emergency,Full-Time,48,40,10,11
+E002,Mark Brown (Low Risk),Technician,ICU,Full-Time,48,40,5,11
+E003,John Doe (Moderate Risk),Security Officer,Security,Full-Time,48,40,5,11
+E004,Emily White (Moderate Risk),Nurse,General Ward,Full-Time,48,40,2,11
+E005,Robert Black (Moderate Risk),Paramedic,Emergency,Full-Time,48,40,7,11
+E006,Lisa Green (Moderate Risk),Technician,Lab,Full-Time,48,40,3,11
+E007,Alice Johnson (High Risk),Paramedic,Emergency,Full-Time,48,36,8,11
+E008,Tom Clark (High Risk),Security Guard,Security,Full-Time,48,40,4,11
+E009,Sarah Connor (Critical Risk),Charge Nurse,Emergency,Full-Time,48,40,12,11
+E010,David Davis (Critical Risk),Supervisor,Logistics,Full-Time,48,40,15,11

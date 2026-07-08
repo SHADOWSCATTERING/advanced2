@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.env
+shift_planning.db
+*.db
+.DS_Store
+venv/
+.venv/

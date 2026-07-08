@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Learn about our Workforce Shift Planning and Fatigue Risk Management System. An AI-powered solution for safer shift scheduling.">
+    <title>Fatigue X - Workforce Shift Planning & Fatigue Risk Management</title>
+    <!-- Preload fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="navbar">
+        <div class="container">
+            <a href="#" class="logo">Fatigue <span class="logo-x">X</span></a>
+            <div class="header-actions">
+                <button id="btn-account-icon" aria-label="Account">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-user">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                </button>
+                <button class="mobile-toggle" aria-label="Toggle Navigation">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+            <nav class="nav-links">
+                <div class="nav-indicator"></div>
+                <a href="#about">About</a>
+                <a href="#workflow">Workflow</a>
+                <a href="#rules">Fatigue Rules</a>
+                <a href="#dashboard" class="nav-highlight">Interactive Dashboard</a>
+                <a href="#api">API Reference</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <!-- Hero Section -->
+        <section class="hero" id="hero">
+            <div class="container hero-content">
+                <h1 class="fade-in-up">Workforce Shift Planning <br> <span class="highlight-green">&amp;</span> Fatigue Risk Management</h1>
+                <p class="fade-in-up delay-1">Empowering managers to schedule safer shifts with deterministic rule engines and AI-driven explanations.</p>
+                <div class="cta-group fade-in-up delay-2">
+                    <a href="#about" class="btn btn-primary">Learn How It Works</a>
+                    <a href="#rules" class="btn btn-secondary">View Fatigue Rules</a>
+                </div>
+            </div>
+            <!-- Ambient Background & Heartbeat Motif -->
+            <div class="ambient-bg"></div>
+            <div class="heartbeat-container">
+                <svg viewBox="0 0 800 100" class="heartbeat-line" preserveAspectRatio="none">
+                    <path d="M0,50 L350,50 L370,10 L390,90 L410,20 L430,70 L440,50 L800,50" fill="none" stroke="var(--accent-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </div>
+        </section>
+
+        <!-- Problem Statement -->
+        <section class="about" id="about">
+            <div class="container">
+                <div class="grid-2">
+                    <div class="about-text">
+                        <h2>The <span class="highlight-red">Problem</span> with Shift Scheduling</h2>
+                        <p>Shift managers in hospitals, factories, warehouses, and security teams routinely assign shifts without an easy way to see whether a schedule is pushing an employee into fatigue territory.</p>
+                        <p>Too little rest, too many consecutive days, too many night shifts, or accidental double-booking can lead to critical safety risks. This system automatically flags these risks.</p>
+                    </div>
+                    <div class="about-solution card">
+                        <h3>Our <span class="highlight-green">Solution</span></h3>
+                        <p>Our API gives managers visibility automatically, every time a shift is created or reviewed. We combine a deterministic rule engine with an Anthropic AI layer that explains <em>why</em> a schedule is risky and suggests safer alternatives.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Workflow Section -->
+        <section class="workflow" id="workflow">
+            <div class="container">
+                <h2 class="text-center">System <span class="highlight-green">Workflow</span></h2>
+                <div class="workflow-steps">
+                    <div class="step-card">
+                        <div class="step-icon">1</div>
+                        <h4>Manager Request</h4>
+                        <p>Manager assigns or reviews a shift via the Flask API.</p>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step-card">
+                        <div class="step-icon">2</div>
+                        <h4>Fatigue Engine</h4>
+                        <p>Checks rest hours, consecutive days, weekly hours, nights, and overlaps.</p>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step-card risk-decision" id="dynamic-risk-card">
+                        <div class="step-icon alert-icon">3</div>
+                        <h4>Risk Assessment</h4>
+                        <p>Are violations found? <span class="status-indicator">Hover to simulate</span></p>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step-card">
+                        <div class="step-icon">4</div>
+                        <h4>AI Explanation</h4>
+                        <p>Explains violations &amp; recommends an alternative in plain English.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Rules Section -->
+        <section class="rules" id="rules">
+            <div class="container">
+                <h2 class="text-center">Fatigue <span class="highlight-red">Rules</span> Implemented</h2>
+                <div class="rules-grid">
+                    <div class="rule-card">
+                        <h4>Rest Between Shifts</h4>
+                        <p class="threshold">&ge; 11 hours</p>
+                        <span class="severity high">High Severity</span>
+                    </div>
+                    <div class="rule-card">
+                        <h4>Consecutive Working Days</h4>
+                        <p class="threshold">&le; 6 days</p>
+                        <span class="severity high">High Severity</span>
+                    </div>
+                    <div class="rule-card">
+                        <h4>Weekly Working Hours</h4>
+                        <p class="threshold">&le; 48 hours</p>
+                        <span class="severity critical">Critical Severity</span>
+                    </div>
+                    <div class="rule-card">
+                        <h4>Single Shift Length</h4>
+                        <p class="threshold">&le; 12 hours</p>
+                        <span class="severity medium">Medium Severity</span>
+                    </div>
+                    <div class="rule-card">
+                        <h4>Consecutive Night Shifts</h4>
+                        <p class="threshold">&le; 3 in a row</p>
+                        <span class="severity critical">Critical Severity</span>
+                    </div>
+                    <div class="rule-card">
+                        <h4>Shift Overlap</h4>
+                        <p class="threshold">0 allowed</p>
+                        <span class="severity critical">Critical Severity</span>
+                    </div>
+                    <div class="rule-card">
+                        <h4>Quick Turnaround</h4>
+                        <p class="threshold">&lt; 11h rest</p>
+                        <span class="severity medium">Medium Severity</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Interactive Dashboard Section -->
+        <section class="dashboard-section" id="dashboard">
+            <div class="container">
+                <h2 class="text-center">Shift Planning <span class="highlight-green">Dashboard</span></h2>
+                <p class="text-center section-subtitle" style="color: var(--text-secondary); margin-bottom: 2.5rem; font-size: 1.1rem;">Review employee workloads, check fatigue risks, and validate or assign new shifts in real-time.</p>
+
+                <!-- API Status and Seeding Bar -->
+                <div class="status-bar card" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; padding: 1.5rem 2rem; flex-wrap: wrap; gap: 1.5rem;">
+                    <div class="status-indicators" style="display: flex; gap: 2rem; flex-wrap: wrap;">
+                        <div class="status-item" style="display: flex; align-items: center; gap: 8px;">
+                            <span class="status-dot" id="db-status-dot" style="width: 10px; height: 10px; border-radius: 50%; background-color: #f59e0b;"></span>
+                            <span class="status-label" style="font-weight: 600; color: var(--text-secondary);">Database:</span>
+                            <span class="status-value" id="db-status-text" style="font-weight: 600;">Checking...</span>
+                        </div>
+                        <div class="status-item" style="display: flex; align-items: center; gap: 8px;">
+                            <span class="status-dot" id="ai-status-dot" style="width: 10px; height: 10px; border-radius: 50%; background-color: #f59e0b;"></span>
+                            <span class="status-label" style="font-weight: 600; color: var(--text-secondary);">AI Explainer:</span>
+                            <span class="status-value" id="ai-status-text" style="font-weight: 600;">Checking...</span>
+                        </div>
+                    </div>
+                    <div class="status-actions">
+                        <button class="btn btn-primary btn-sm" id="btn-generate-schedule" style="padding: 0.5rem 1.2rem; font-size: 0.85rem; margin-right: 10px;">Auto-Generate Schedule</button>
+                        <a href="/api/reports/compliance" target="_blank" class="btn btn-secondary btn-sm" style="padding: 0.5rem 1.2rem; font-size: 0.85rem; margin-right: 10px; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-primary); transition: all 0.3s ease;">Export Compliance (CSV)</a>
+                        <button class="btn btn-secondary btn-sm" id="btn-seed-db" style="padding: 0.5rem 1.2rem; font-size: 0.85rem;">Seed/Reset Data</button>
+                    </div>
+                </div>
+
+                <!-- Dashboard View Toggles -->
+                <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; justify-content: flex-start; align-items: center; background: rgba(255,255,255,0.02); padding: 0.8rem 1.5rem; border-radius: var(--border-radius); border: 1px solid rgba(255,255,255,0.05);">
+                    <span style="color: var(--text-secondary); font-weight: 600; font-size: 0.85rem; text-transform: uppercase;">View Mode:</span>
+                    <button class="btn btn-secondary active-view" id="btn-view-list" style="padding: 0.4rem 1rem; font-size: 0.85rem; border-color: var(--accent-green); color: var(--accent-green);">List View</button>
+                    <button class="btn btn-secondary" id="btn-view-heatmap" style="padding: 0.4rem 1rem; font-size: 0.85rem;">Team Heatmap</button>
+                </div>
+
+                <!-- Dashboard Grid (List View) -->
+                <div class="dashboard-grid" id="dashboard-list-panel">
+                    <!-- Left Column: Search & Employee List -->
+                    <div class="employee-list-panel card" style="display: flex; flex-direction: column;">
+                        <div class="panel-header" style="margin-bottom: 1.5rem;">
+                            <h3 id="employee-list-title" style="font-size: 1.5rem; margin-bottom: 1rem;">Test Cases</h3>
+                            <input type="text" id="employee-search" placeholder="Search employees..." class="form-control">
+                        </div>
+                        <div class="employee-list" id="employee-list-container" style="flex: 1; max-height: 500px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px; margin-bottom: 2rem;">
+                            <div class="loading-spinner" style="text-align: center; color: var(--text-secondary); padding: 2rem 0;">Loading employees...</div>
+                        </div>
+
+                        <!-- Self-Serve CSV Ecosystem (Item 5) -->
+                        <div class="csv-upload-section" style="background: rgba(255,255,255,0.02); padding: 1.5rem; border-radius: var(--border-radius); border: 1px solid rgba(255,255,255,0.05); margin-top: auto;">
+                            <h4 style="margin-bottom: 0.5rem; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+                                <span>Try it with your own data</span>
+                            </h4>
+                            <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1rem;">Upload your own schedule and analyze fatigue risks.</p>
+                            
+                            <div id="logged-out-upload-cta">
+                                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Please log in to manage your data.</p>
+                                <button id="btn-open-login-sidebar" class="btn btn-primary btn-sm" style="width: 100%;">Log In / Register</button>
+                            </div>
+                            
+                            <div id="upload-section" class="hidden">
+                                <div style="margin-bottom: 1rem; display: flex; justify-content: center;">
+                                    <a href="/api/download-example-csv" target="_blank" class="btn btn-secondary btn-sm" style="width: 100%; text-align: center; text-decoration: none; padding: 0.5rem; font-size: 0.85rem;">Download Example CSV</a>
+                                </div>
+                                <form id="upload-form" style="display: flex; flex-direction: column; gap: 0.8rem;">
+                                    <div class="form-group" style="margin: 0;">
+                                        <label for="csv-file" style="font-size: 0.85rem; margin-bottom: 0.3rem;">Upload shifts.csv</label>
+                                        <input type="file" id="csv-file" accept=".csv" required class="form-control" style="width: 100%; padding: 0.5rem;">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary" style="width: 100%;">Upload & Analyze</button>
+                                </form>
+                                <form id="sheet-form" style="display: flex; flex-direction: column; gap: 0.8rem; margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1rem;">
+                                    <div class="form-group" style="margin: 0;">
+                                        <label for="sheet-url" style="font-size: 0.85rem; margin-bottom: 0.3rem;">Import from Google Sheets</label>
+                                        <input type="text" id="sheet-url" placeholder="Paste Sheet URL or ID" required class="form-control" style="width: 100%; padding: 0.5rem;">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary" style="width: 100%;">Import Sheet</button>
+                                </form>
+                                <div id="upload-status" style="margin-top: 0.8rem; font-size: 0.85rem; text-align: center;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Employee Risk Breakdown & Assignment -->
+                    <div class="employee-details-panel card" id="details-panel" style="min-height: 400px; display: flex; flex-direction: column;">
+                        <div class="empty-state" id="panel-empty-state" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; flex: 1; padding: 3rem 1.5rem;">
+                            <div class="empty-icon" style="font-size: 4rem; margin-bottom: 1.5rem;">👤</div>
+                            <h3 style="font-size: 1.6rem; margin-bottom: 0.8rem;">Select an Employee</h3>
+                            <p style="color: var(--text-secondary); max-width: 400px;">Choose an employee from the list to view their shift roster, analyze fatigue risks, and assign or validate new shifts.</p>
+                        </div>
+                        
+                        <!-- Dynamic details content (hidden by default) -->
+                        <div class="details-content hidden" id="panel-details-content">
+                            <div class="employee-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                                <div>
+                                    <h3 id="detail-emp-name" style="font-size: 1.8rem; margin-bottom: 0.2rem;">John Doe</h3>
+                                    <p id="detail-emp-meta" style="color: var(--text-secondary);">Senior Nurse | Emergency Dept</p>
+                                </div>
+                                <span class="risk-badge" id="detail-emp-risk-badge">Medium Risk</span>
+                            </div>
+
+                            <!-- Fatigue Score Meter -->
+                            <div class="score-container" style="margin-bottom: 1.5rem;">
+                                <div class="score-label-row" style="display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.95rem;">
+                                    <span>Fatigue Risk Score</span>
+                                    <span id="detail-emp-score">35 / 100</span>
+                                </div>
+                                <div class="score-bar-bg" style="height: 10px; background-color: rgba(255,255,255,0.08); border-radius: 5px; overflow: hidden;">
+                                    <div class="score-bar" id="detail-emp-score-bar" style="width: 35%; height: 100%; border-radius: 5px; transition: width 0.5s ease;"></div>
+                                </div>
+                            </div>
+
+                            <!-- Employee Contract Details -->
+                            <div class="employee-stats-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                                <div class="stat-card" style="background: rgba(255,255,255,0.02); padding: 1rem; border-radius: var(--border-radius); border: 1px solid rgba(255,255,255,0.03); display: flex; flex-direction: column;">
+                                    <span class="stat-lbl" style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.3rem;">Contracted</span>
+                                    <span class="stat-val" id="detail-emp-contract-hours" style="font-size: 1.2rem; font-weight: 700;">40h</span>
+                                </div>
+                                <div class="stat-card" style="background: rgba(255,255,255,0.02); padding: 1rem; border-radius: var(--border-radius); border: 1px solid rgba(255,255,255,0.03); display: flex; flex-direction: column;">
+                                    <span class="stat-lbl" style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.3rem;">Max Weekly</span>
+                                    <span class="stat-val" id="detail-emp-max-hours" style="font-size: 1.2rem; font-weight: 700;">48h</span>
+                                </div>
+                                <div class="stat-card" style="background: rgba(255,255,255,0.02); padding: 1rem; border-radius: var(--border-radius); border: 1px solid rgba(255,255,255,0.03); display: flex; flex-direction: column;">
+                                    <span class="stat-lbl" style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.3rem;">Min Rest</span>
+                                    <span class="stat-val" id="detail-emp-rest" style="font-size: 1.2rem; font-weight: 700;">11h</span>
+                                </div>
+                            </div>
+
+                            <!-- Active Violations -->
+                            <div class="violations-section" id="violations-container" style="margin-bottom: 1.8rem;">
+                                <h4 style="font-size: 1.1rem; margin-bottom: 0.8rem;">Active Safety Violations</h4>
+                                <div class="violations-list" id="detail-violations-list" style="display: flex; flex-direction: column; gap: 8px;">
+                                    <!-- Dynamic -->
+                                </div>
+                            </div>
+
+                            <!-- AI Explanation Section -->
+                            <div class="ai-explanation-box" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); padding: 1.5rem; border-radius: var(--border-radius); margin-bottom: 2rem;">
+                                <div class="ai-box-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.8rem;">
+                                    <h4 style="font-size: 1.1rem; margin-bottom: 0;">AI Explanation &amp; Recommendations</h4>
+                                    <span class="ai-source-badge" id="detail-ai-source">AI Powered</span>
+                                </div>
+                                <div class="ai-box-body" style="display: flex; flex-direction: column; gap: 1rem;">
+                                    <p class="ai-explanation" id="detail-ai-explanation" style="line-height: 1.5; color: var(--text-primary); font-size: 0.95rem; font-style: italic;"></p>
+                                    
+                                    <div class="ai-recommendation-group" id="group-ai-urgent" style="background: rgba(255,51,51,0.03); padding: 0.8rem 1rem; border-radius: 8px; border-left: 3px solid var(--accent-red);">
+                                        <h5 style="font-size: 0.85rem; text-transform: uppercase; color: var(--accent-red); margin-bottom: 0.3rem;">Most Urgent Issue</h5>
+                                        <p id="detail-ai-urgent" style="font-size: 0.9rem; margin-bottom: 0;"></p>
+                                    </div>
+                                    <div class="ai-recommendation-group" id="group-ai-rec" style="background: rgba(0,204,102,0.03); padding: 0.8rem 1rem; border-radius: 8px; border-left: 3px solid var(--accent-green);">
+                                        <h5 style="font-size: 0.85rem; text-transform: uppercase; color: var(--accent-green); margin-bottom: 0.3rem;">Suggested Action</h5>
+                                        <p id="detail-ai-recommendation" style="font-size: 0.9rem; margin-bottom: 0;"></p>
+                                    </div>
+                                </div>
+                                <div class="ai-chat-box" style="margin-top: 1.5rem; background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px;">
+                                    <h5 style="margin-bottom: 0.8rem; color: var(--text-secondary);">Ask a follow-up question</h5>
+                                    <div id="ai-chat-history" style="max-height: 200px; overflow-y: auto; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.9rem;">
+                                        <!-- Messages go here -->
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem;">
+                                        <input type="text" id="ai-chat-input" class="form-control" placeholder="E.g. What if I give them Saturday off?" style="flex: 1;">
+                                        <button id="btn-ai-chat-send" class="btn btn-secondary" style="padding: 0.5rem 1rem;">Send</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Shift Action Tabs -->
+                            <div class="tab-container" style="margin-top: 1.5rem;">
+                                <div class="tab-headers" style="display: flex; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 1.5rem; gap: 1rem;">
+                                    <button class="tab-btn active" data-tab="tab-roster">Current Roster</button>
+                                    <button class="tab-btn" data-tab="tab-assign">Assign / Validate Shift</button>
+                                    <button class="tab-btn" data-tab="tab-rest-day">Add Rest Day</button>
+                                    <button class="tab-btn" data-tab="tab-fatigue">Log Fatigue Rating</button>
+                                </div>
+                                
+                                <!-- Tab 1: Current Roster -->
+                                <div class="tab-content" id="tab-roster">
+                                    <div class="table-responsive">
+                                        <table class="roster-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Shift Type</th>
+                                                    <th>Hours</th>
+                                                    <th>Location</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="detail-roster-body">
+                                                <!-- Dynamic -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Tab 2: Assign/Validate Shift Form -->
+                                <div class="tab-content hidden" id="tab-assign">
+                                    <form id="shift-assignment-form" class="dashboard-form">
+                                        <div class="form-row">
+                                            <div class="form-group">
+                                                <label for="shift-date">Shift Date</label>
+                                                <input type="date" id="shift-date" required class="form-control">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="shift-type">Shift Type</label>
+                                                <select id="shift-type" required class="form-control">
+                                                    <option value="Day">Day</option>
+                                                    <option value="Morning">Morning</option>
+                                                    <option value="Evening">Evening</option>
+                                                    <option value="Night">Night</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="form-row">
+                                            <div class="form-group">
+                                                <label for="start-time">Start Time</label>
+                                                <input type="time" id="start-time" required class="form-control">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="end-time">End Time</label>
+                                                <input type="time" id="end-time" required class="form-control">
+                                            </div>
+                                        </div>
+                                        <div class="form-row">
+                                            <div class="form-group">
+                                                <label for="location">Location (Optional)</label>
+                                                <input type="text" id="location" placeholder="e.g. Ward A" class="form-control">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="department">Department (Optional)</label>
+                                                <input type="text" id="department" placeholder="e.g. Emergency" class="form-control">
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Form Buttons -->
+                                        <div class="form-actions" style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                                            <button type="button" class="btn btn-secondary" id="btn-validate-shift" style="flex: 1;">Dry-Run Check</button>
+                                            <button type="submit" class="btn btn-primary" id="btn-assign-shift" style="flex: 1;">Assign Shift</button>
+                                        </div>
+                                    </form>
+
+                                    <!-- Shift Validation Feedback Results -->
+                                    <div class="validation-results hidden" id="validation-results-box" style="margin-top: 2rem; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 1.5rem; border-radius: var(--border-radius);">
+                                        <div class="results-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.06);">
+                                            <h4 style="font-size: 1.1rem; margin-bottom: 0;">Validation Feedback</h4>
+                                            <span class="risk-badge" id="val-risk-badge">Low Risk</span>
+                                        </div>
+                                        <div class="results-body" style="display: flex; flex-direction: column; gap: 1rem;">
+                                            <p id="val-summary-text" style="font-size: 0.95rem;"></p>
+                                            
+                                            <!-- Violations introducing -->
+                                            <div class="val-violations-box hidden" id="val-violations-box" style="background: rgba(255,51,51,0.03); border: 1px solid rgba(255,51,51,0.1); padding: 1rem; border-radius: 8px;">
+                                                <h5 style="font-size: 0.85rem; text-transform: uppercase; color: var(--accent-red); margin-bottom: 0.5rem;">Predicted Violations</h5>
+                                                <ul id="val-violations-list" style="padding-left: 1.2rem; font-size: 0.9rem; display: flex; flex-direction: column; gap: 5px;"></ul>
+                                            </div>
+
+                                            <!-- AI explanation for new shift -->
+                                            <div class="val-ai-box" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); padding: 1rem; border-radius: 8px; display: flex; flex-direction: column; gap: 0.8rem;">
+                                                <div class="ai-box-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.04); padding-bottom: 0.5rem; margin-bottom: 0.3rem;">
+                                                    <h5 style="font-size: 0.9rem; margin-bottom: 0;">AI Predicted Risk Explanation</h5>
+                                                    <span class="ai-source-badge" id="val-ai-source">AI Powered</span>
+                                                </div>
+                                                <p id="val-ai-explanation" style="font-size: 0.9rem; line-height: 1.4; color: var(--text-primary); font-style: italic;"></p>
+                                                
+                                                <div class="ai-recommendation-group" id="val-ai-alternatives-group" style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 0.8rem;">
+                                                    <h5 style="font-size: 0.85rem; text-transform: uppercase; color: var(--accent-green); margin-bottom: 0.5rem;">Suggested Safer Alternatives</h5>
+                                                    <div id="val-ai-alternatives" style="display: flex; flex-direction: column; gap: 8px;"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                </div>
+                                
+                                <!-- Tab 3: Add Rest Day Form -->
+                                <div class="tab-content hidden" id="tab-rest-day">
+                                    <form id="rest-day-form" class="dashboard-form">
+                                        <div class="form-row">
+                                            <div class="form-group" style="flex: 1;">
+                                                <label for="rest-date">Rest Date</label>
+                                                <input type="date" id="rest-date" required class="form-control">
+                                            </div>
+                                        </div>
+                                        <div class="form-row">
+                                            <div class="form-group" style="flex: 1;">
+                                                <label for="rest-notes">Notes (Optional)</label>
+                                                <input type="text" id="rest-notes" placeholder="e.g. Annual Leave, Sick Day" class="form-control">
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Form Buttons -->
+                                        <div class="form-actions" style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                                            <button type="submit" class="btn btn-primary" id="btn-add-rest-day" style="flex: 1; background-color: var(--accent-green); color: #000; border: none; padding: 1rem; font-weight: 600; border-radius: 8px;">Add Rest Day</button>
+                                        </div>
+                                    </form>
+                                </div>
+                                
+                                <!-- Tab 4: Log Subjective Fatigue -->
+                                <div class="tab-content hidden" id="tab-fatigue">
+                                    <form id="fatigue-form" class="dashboard-form">
+                                        <div class="form-row">
+                                            <div class="form-group" style="flex: 1;">
+                                                <label for="fatigue-date">Report Date</label>
+                                                <input type="date" id="fatigue-date" required class="form-control">
+                                            </div>
+                                            <div class="form-group" style="flex: 1;">
+                                                <label for="fatigue-rating">Fatigue Rating (1-7)</label>
+                                                <select id="fatigue-rating" required class="form-control">
+                                                    <option value="1">1 - Fully Alert</option>
+                                                    <option value="2">2 - Very Lively</option>
+                                                    <option value="3">3 - Okay</option>
+                                                    <option value="4" selected>4 - A little tired</option>
+                                                    <option value="5">5 - Moderately tired, let down</option>
+                                                    <option value="6">6 - Extremely tired</option>
+                                                    <option value="7">7 - Completely exhausted</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="form-row">
+                                            <div class="form-group" style="flex: 1;">
+                                                <label for="fatigue-notes">Notes (Optional)</label>
+                                                <input type="text" id="fatigue-notes" placeholder="e.g. Headache, slept poorly" class="form-control">
+                                            </div>
+                                        </div>
+                                        <div class="form-actions" style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                                            <button type="submit" class="btn btn-primary" id="btn-log-fatigue" style="flex: 1; background-color: var(--accent-orange); color: #000; border: none; padding: 1rem; font-weight: 600; border-radius: 8px;">Log Rating</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+
+                <!-- Heatmap View -->
+                <div class="heatmap-view hidden card" id="dashboard-heatmap-panel" style="overflow-x: auto; min-height: 400px;">
+                    <h3 style="margin-bottom: 1.5rem;">Team Fatigue Risk (Cumulative) - Next 7 Days</h3>
+                    <div id="heatmap-loading" class="hidden loading-spinner" style="text-align: center; padding: 3rem 0; color: var(--text-secondary);">Loading heatmap data...</div>
+                    <div class="table-responsive">
+                        <table class="roster-table" style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr id="heatmap-head" style="border-bottom: 1px solid rgba(255,255,255,0.1); text-align: left;">
+                                    <!-- Dynamic -->
+                                </tr>
+                            </thead>
+                            <tbody id="heatmap-body">
+                                <!-- Dynamic -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- API Integration -->
+        <section class="api-integration" id="api">
+            <div class="container">
+                <h2>API <span class="highlight-green">Integration</span></h2>
+                <p>Designed for easy integration with frontend dashboards via RESTful endpoints.</p>
+                <div class="code-window">
+                    <div class="window-header">
+                        <span class="dot red"></span>
+                        <span class="dot yellow"></span>
+                        <span class="dot green"></span>
+                        <span class="window-title">bash</span>
+                    </div>
+                    <div class="window-body">
+                        <code>
+<span class="comment"># Example: checking a new shift before assigning it</span>
+<span class="keyword">curl</span> -X POST http://localhost:5000/api/shifts/validate \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  -d <span class="string">'{
+    "employee_id":"E002",
+    "shift_date":"2026-06-04",
+    "start_time":"15:00",
+    "end_time":"23:00",
+    "shift_type":"Evening"
+  }'</span>
+                        </code>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container footer-content">
+            <div class="footer-logo">
+                <a href="#">Fatigue <span class="logo-x">X</span></a>
+                <p>Ensuring workforce safety, one shift at a time.</p>
+            </div>
+            <div class="footer-links">
+                <h4>Quick Links</h4>
+                <a href="#about">About</a>
+                <a href="#rules">Rules</a>
+                <a href="#dashboard">Dashboard</a>
+                <a href="#api">API</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Workforce Shift Planning System. All Rights Reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Auto-Generate Modal -->
+    <div id="generate-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="margin: 0; font-size: 1.5rem;">Auto-Generate Draft Schedule</h3>
+                <button class="modal-close" id="btn-close-generate-modal">&times;</button>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">The AI-driven constraint solver will attempt to assign a set of standard open shifts across available employees, minimizing overall fatigue risk.</p>
+            
+            <div id="generate-loading" class="hidden" style="text-align: center; padding: 2rem 0;">
+                <div class="loading-spinner" style="margin-bottom: 10px;">Generating optimal schedule...</div>
+                <p style="color: var(--text-secondary); font-size: 0.9rem;">This may take a moment.</p>
+            </div>
+            
+            <div id="generate-results" class="hidden">
+                <h4 style="margin-bottom: 1rem;">Draft Assignments</h4>
+                <div class="table-responsive" style="margin-bottom: 1.5rem; max-height: 300px; overflow-y: auto;">
+                    <table class="roster-table" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); text-align: left;">
+                                <th style="padding: 10px;">Date</th>
+                                <th style="padding: 10px;">Time</th>
+                                <th style="padding: 10px;">Type</th>
+                                <th style="padding: 10px;">Assigned To</th>
+                            </tr>
+                        </thead>
+                        <tbody id="generate-assignments-body">
+                            <!-- Dynamic -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <h4 style="margin-bottom: 1rem; color: var(--accent-red);">Unfilled Shifts</h4>
+                <div class="table-responsive" style="margin-bottom: 1.5rem; max-height: 150px; overflow-y: auto;">
+                    <table class="roster-table" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); text-align: left;">
+                                <th style="padding: 10px;">Date</th>
+                                <th style="padding: 10px;">Time</th>
+                                <th style="padding: 10px;">Type</th>
+                            </tr>
+                        </thead>
+                        <tbody id="generate-unfilled-body">
+                            <!-- Dynamic -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="form-actions" style="display: flex; gap: 1rem; margin-top: 1.5rem; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary" id="btn-cancel-generate">Cancel</button>
+                <button type="button" class="btn btn-primary" id="btn-run-generate" style="background: var(--accent-green);">Run Generation</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="modal hidden">
+        <div class="modal-content">
+            <button id="btn-close-modal" class="close-btn">&times;</button>
+            <div id="modal-logged-in-state" class="hidden" style="text-align: center; padding: 2rem 0;">
+                <h3 style="margin-bottom: 1rem;">Account</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 2rem;">Logged in as <span id="modal-logged-in-email" style="color: var(--accent-green); font-weight: 600;"></span></p>
+                <button class="btn btn-secondary" id="btn-logout" style="width: 100%;">Logout</button>
+            </div>
+            
+            <div id="auth-section">
+                <!-- Auth Tabs -->
+                <div class="tab-headers" id="auth-tabs-container" style="display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                    <button class="tab-btn active" id="btn-tab-login" style="padding: 0.5rem; font-size: 0.85rem;">Log In</button>
+                    <button class="tab-btn" id="btn-tab-register" style="padding: 0.5rem; font-size: 0.85rem;">Register</button>
+                </div>
+                
+                <div id="auth-error-msg" class="hidden" style="color: var(--accent-red); font-size: 0.8rem; margin-bottom: 0.8rem; text-align: center;"></div>
+                <div id="auth-success-msg" class="hidden" style="color: var(--accent-green); font-size: 0.8rem; margin-bottom: 0.8rem; text-align: center;"></div>
+
+                <!-- Log In Form -->
+                <form id="login-form" style="display: flex; flex-direction: column; gap: 0.8rem;">
+                    <input type="email" id="login-email" placeholder="Email" required class="form-control" style="width: 100%;">
+                    <input type="password" id="login-password" placeholder="Password" required class="form-control" style="width: 100%;">
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Log In</button>
+                    <a href="#" id="link-forgot-password" style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; text-decoration: underline;">Forgot Password?</a>
+                </form>
+
+                <!-- Register Form -->
+                <form id="register-form" class="hidden" style="display: flex; flex-direction: column; gap: 0.8rem;">
+                    <input type="email" id="register-email" placeholder="Email" required class="form-control" style="width: 100%;">
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="register-fname" placeholder="First Name" required class="form-control" style="flex: 1; width: 100%;">
+                        <input type="text" id="register-lname" placeholder="Last Name" required class="form-control" style="flex: 1; width: 100%;">
+                    </div>
+                    <input type="password" id="register-password" placeholder="Password (min 8 chars, 1 number)" required class="form-control" style="width: 100%;">
+                    <select id="register-sq" required class="form-control" style="width: 100%;">
+                        <option value="" disabled selected>Select a Security Question</option>
+                        <option value="What was your first pet's name?">What was your first pet's name?</option>
+                        <option value="What city were you born in?">What city were you born in?</option>
+                        <option value="What is your mother's maiden name?">What is your mother's maiden name?</option>
+                    </select>
+                    <input type="text" id="register-sa" placeholder="Security Answer" required class="form-control" style="width: 100%;">
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Register</button>
+                </form>
+
+                <!-- Forgot Password Form (Step 1) -->
+                <form id="forgot-form-1" class="hidden" style="display: flex; flex-direction: column; gap: 0.8rem;">
+                    <input type="email" id="forgot-email" placeholder="Enter your Email" required class="form-control" style="width: 100%;">
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Get Security Question</button>
+                    <a href="#" id="link-back-login-1" style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; text-decoration: underline;">Back to Log In</a>
+                </form>
+
+                <!-- Forgot Password Form (Step 2) -->
+                <form id="forgot-form-2" class="hidden" style="display: flex; flex-direction: column; gap: 0.8rem;">
+                    <p id="forgot-sq-display" style="font-size: 0.85rem; color: var(--text-secondary); text-align: center; font-style: italic;"></p>
+                    <input type="text" id="forgot-sa" placeholder="Security Answer" required class="form-control" style="width: 100%;">
+                    <input type="password" id="forgot-new-password" placeholder="New Password (min 8 chars, 1 number)" required class="form-control" style="width: 100%;">
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Reset Password</button>
+                    <a href="#" id="link-back-login-2" style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; text-decoration: underline;">Back to Log In</a>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- GSAP & ScrollTrigger -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

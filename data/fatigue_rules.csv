@@ -1,0 +1,8 @@
+rule_id,rule_name,description,threshold_value,unit,severity
+R001,Minimum Rest Between Shifts,Employee must have at least 11 hours of rest between the end of one shift and the start of the next.,11,hours,High
+R002,Maximum Consecutive Working Days,Employee should not work more than 6 consecutive days without a rest day.,6,days,High
+R003,Maximum Weekly Working Hours,Total scheduled hours in any rolling 7-day window should not exceed the employee's max weekly hours (default 48).,48,hours/week,Critical
+R004,Maximum Single Shift Length,A single shift should not exceed 12 hours.,12,hours,Medium
+R005,Maximum Consecutive Night Shifts,Employee should not work more than 3 consecutive night shifts in a row.,3,shifts,Critical
+R006,Shift Overlap / Double-Booking,An employee cannot be scheduled for two overlapping shifts on the same day.,0,overlap_count,Critical
+R007,Quick Turnaround (Clopening),Closing shift followed by an opening shift the next day with less than 11 hours rest is flagged as a clopening risk.,11,hours,Medium

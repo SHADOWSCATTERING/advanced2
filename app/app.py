@@ -586,20 +586,6 @@ def ai_chat():
     reply = chat_with_ai(analysis, safer_alternatives, history, message)
     return jsonify({"reply": reply})
 
-@app.route("/api/ai/models", methods=["GET"])
-def list_ai_models():
-    """Temporary diagnostic endpoint to check which Gemini models the API key has access to."""
-    import requests, os
-    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
-    if not api_key:
-        return jsonify({"error": "No API key found in environment"})
-    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
-    try:
-        resp = requests.get(url)
-        return jsonify(resp.json())
-    except Exception as e:
-        return jsonify({"error": str(e)})
-
 # ---------------------------------------------------------------------
 # Reports
 # ---------------------------------------------------------------------

@@ -27,7 +27,7 @@ import os
 import json
 import requests
 
-GEMINI_MODEL = "gemini-1.5-flash"
+GEMINI_MODEL = "gemini-1.5-flash-latest"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 REQUEST_TIMEOUT_SECONDS = 20
 
@@ -49,19 +49,16 @@ SYSTEM_PROMPT = (
 
 
 def _call_gemini(analysis: dict, safer_alternatives: list = None) -> dict | None:
-    api_key = os.environ.get("GEMINI_API_KEY", "")
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
         return None
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={api_key}"
     payload = {
-        "systemInstruction": {
-            "parts": [{"text": SYSTEM_PROMPT}]
-        },
         "contents": [
             {
                 "role": "user",
-                "parts": [{"text": json.dumps({
+                "parts": [{"text": f"System Instructions: {SYSTEM_PROMPT}\n\nContext Data:\n" + json.dumps({
                     "fatigue_analysis": analysis,
                     "safer_alternatives": safer_alternatives or [],
                 }, default=str)}]
@@ -174,7 +171,7 @@ def is_ai_configured() -> bool:
 
 def chat_with_ai(analysis: dict, safer_alternatives: list, history: list, new_message: str) -> str:
     """Multi-turn conversation about the fatigue analysis."""
-    api_key = os.environ.get("GEMINI_API_KEY", "")
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
         return "I'm sorry, the AI chat feature requires an active Gemini API key."
 
@@ -189,14 +186,16 @@ def chat_with_ai(analysis: dict, safer_alternatives: list, history: list, new_me
         "safer_alternatives": safer_alternatives or [],
     }, default=str)
     
+    first_msg_text = f"System Instructions: {system_prompt}\n\nContext Data:\n{context_str}\n\n"
+    
     contents = []
     if not history:
-        contents.append({"role": "user", "parts": [{"text": f"<context>{context_str}</context>\n\nQuestion: {new_message}"}]})
+        contents.append({"role": "user", "parts": [{"text": first_msg_text + f"User: {new_message}"}]})
     else:
         first_user_msg = history[0]
         contents.append({
             "role": "user",
-            "parts": [{"text": f"<context>{context_str}</context>\n\n{first_user_msg['content']}"}]
+            "parts": [{"text": first_msg_text + f"User: {first_user_msg['content']}"}]
         })
         for msg in history[1:]:
             role = "model" if msg["role"] == "assistant" else "user"
@@ -207,9 +206,6 @@ def chat_with_ai(analysis: dict, safer_alternatives: list, history: list, new_me
         contents.append({"role": "user", "parts": [{"text": new_message}]})
 
     payload = {
-        "systemInstruction": {
-            "parts": [{"text": system_prompt}]
-        },
         "contents": contents,
         "generationConfig": {
             "temperature": 0.5
@@ -230,9 +226,15 @@ def chat_with_ai(analysis: dict, safer_alternatives: list, history: list, new_me
             resp.raise_for_status()
             data = resp.json()
             return data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip()
+        except requests.exceptions.HTTPError as he:
+            print(f"[ai_service] HTTP Error: {he.response.text}")
+            if attempt < max_retries - 1:
+                time.sleep(1)
+            else:
+                return f"API Error ({he.response.status_code}): {he.response.text}"
         except Exception as exc:
             print(f"[ai_service] Chat API call failed (attempt {attempt+1}). Reason: {exc}")
             if attempt < max_retries - 1:
                 time.sleep(1)
             else:
-                return "Sorry, I encountered an error communicating with the AI service. Please try again later."
+                return f"Sorry, I encountered an error communicating with the AI service. Reason: {exc}"

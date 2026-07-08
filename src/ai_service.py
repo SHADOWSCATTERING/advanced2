@@ -27,7 +27,7 @@ import os
 import json
 import requests
 
-GEMINI_MODEL = "gemini-1.5-flash-latest"
+GEMINI_MODEL = "gemini-1.0-pro"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 REQUEST_TIMEOUT_SECONDS = 20
 

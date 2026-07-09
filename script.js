@@ -66,7 +66,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnLogout = document.getElementById('btn-logout');
     const uploadForm = document.getElementById('upload-form');
     const csvFile = document.getElementById('csv-file');
-    const uploadStatus = document.getElementById('upload-status');
     const employeeListTitle = document.getElementById('employee-list-title');
 
     function openModal() {
@@ -303,8 +302,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             const formData = new FormData();
             formData.append('file', file);
             
-            uploadStatus.textContent = "Uploading...";
-            uploadStatus.style.color = "var(--text-secondary)";
+            const csvStatus = document.getElementById('csv-status');
+            if (csvStatus) {
+                csvStatus.textContent = "Uploading...";
+                csvStatus.style.color = "var(--text-secondary)";
+            }
             
             try {
                 const res = await window.fetch(`/api/upload-csv`, {
@@ -314,14 +316,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || "Upload failed");
                 
-                uploadStatus.textContent = "Success! " + data.message;
-                uploadStatus.style.color = "var(--accent-green)";
+                if (csvStatus) {
+                    csvStatus.textContent = "Success! " + data.message;
+                    csvStatus.style.color = "var(--accent-green)";
+                }
                 csvFile.value = '';
                 
                 if (typeof loadEmployees === 'function') loadEmployees();
             } catch (err) {
-                uploadStatus.textContent = "Error: " + err.message;
-                uploadStatus.style.color = "var(--accent-red)";
+                if (csvStatus) {
+                    csvStatus.textContent = "Error: " + err.message;
+                    csvStatus.style.color = "var(--accent-red)";
+                }
             }
         });
     }
@@ -401,7 +407,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         e.preventDefault();
         const url = document.getElementById('link-sheet-url').value.trim();
         if (!url) return;
-        if (uploadStatus) { uploadStatus.textContent = 'Connecting sheet...'; uploadStatus.style.color = 'var(--text-secondary)'; }
+        const sheetStatus = document.getElementById('sheet-status');
+        if (sheetStatus) { sheetStatus.textContent = 'Connecting sheet...'; sheetStatus.style.color = 'var(--text-secondary)'; }
         try {
             const res = await window.fetch('/api/sheets/link', {
                 method: 'POST',
@@ -410,27 +417,32 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to link sheet');
-            if (uploadStatus) { uploadStatus.textContent = 'Connected! ' + (data.message || ''); uploadStatus.style.color = 'var(--accent-green)'; }
+            const sheetStatus = document.getElementById('sheet-status');
+            if (sheetStatus) { sheetStatus.textContent = 'Connected! ' + (data.message || ''); sheetStatus.style.color = 'var(--accent-green)'; }
             document.getElementById('link-sheet-url').value = '';
             showLinkedSheetUI({ linked: true, sheet_id: data.linked_sheet_id, sheet_name: data.linked_sheet_name, last_synced: data.last_synced });
             startSheetPolling();
             if (typeof loadEmployees === 'function') loadEmployees();
         } catch (err) {
-            if (uploadStatus) { uploadStatus.textContent = 'Error: ' + err.message; uploadStatus.style.color = 'var(--accent-red)'; }
+            const sheetStatus = document.getElementById('sheet-status');
+            if (sheetStatus) { sheetStatus.textContent = 'Error: ' + err.message; sheetStatus.style.color = 'var(--accent-red)'; }
         }
     });
 
     document.getElementById('btn-sync-now')?.addEventListener('click', async () => {
-        if (uploadStatus) { uploadStatus.textContent = 'Syncing...'; uploadStatus.style.color = 'var(--text-secondary)'; }
+        const sheetStatus = document.getElementById('sheet-status');
+        if (sheetStatus) { sheetStatus.textContent = 'Syncing...'; sheetStatus.style.color = 'var(--text-secondary)'; }
         try {
             const res = await window.fetch('/api/sheets/sync', { method: 'POST' });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Sync failed');
-            if (uploadStatus) { uploadStatus.textContent = 'Synced! ' + (data.message || ''); uploadStatus.style.color = 'var(--accent-green)'; }
+            const sheetStatus = document.getElementById('sheet-status');
+            if (sheetStatus) { sheetStatus.textContent = 'Synced! ' + (data.message || ''); sheetStatus.style.color = 'var(--accent-green)'; }
             if (linkedSheetLastSynced) linkedSheetLastSynced.textContent = formatSyncTime(data.last_synced);
             if (typeof loadEmployees === 'function') loadEmployees();
         } catch (err) {
-            if (uploadStatus) { uploadStatus.textContent = 'Error: ' + err.message; uploadStatus.style.color = 'var(--accent-red)'; }
+            const sheetStatus = document.getElementById('sheet-status');
+            if (sheetStatus) { sheetStatus.textContent = 'Error: ' + err.message; sheetStatus.style.color = 'var(--accent-red)'; }
         }
     });
 
@@ -449,9 +461,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         const sheetUrl = document.getElementById('sheet-url').value.trim();
         if (!sheetUrl) return;
         
-        if (uploadStatus) {
-            uploadStatus.textContent = "Importing from Google Sheets...";
-            uploadStatus.style.color = "var(--text-secondary)";
+        const sheetStatus = document.getElementById('sheet-status');
+        if (sheetStatus) {
+            sheetStatus.textContent = "Importing from Google Sheets...";
+            sheetStatus.style.color = "var(--text-secondary)";
         }
         
         try {
@@ -463,17 +476,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Import failed");
             
-            if (uploadStatus) {
-                uploadStatus.textContent = "Success! " + data.message;
-                uploadStatus.style.color = "var(--accent-green)";
+            if (sheetStatus) {
+                sheetStatus.textContent = "Success! " + data.message;
+                sheetStatus.style.color = "var(--accent-green)";
             }
             document.getElementById('sheet-url').value = '';
             
             if (typeof loadEmployees === 'function') loadEmployees();
         } catch (err) {
-            if (uploadStatus) {
-                uploadStatus.textContent = "Error: " + err.message;
-                uploadStatus.style.color = "var(--accent-red)";
+            if (sheetStatus) {
+                sheetStatus.textContent = "Error: " + err.message;
+                sheetStatus.style.color = "var(--accent-red)";
             }
         }
     });

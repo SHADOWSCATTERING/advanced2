@@ -1166,6 +1166,11 @@ def _process_shifts_data(shifts, owner):
     shifts_inserted = 0
     conn = get_connection()
     try:
+        conn.execute("DELETE FROM subjective_fatigue WHERE owner_email = %s", (owner,))
+        conn.execute("DELETE FROM availability WHERE owner_email = %s", (owner,))
+        conn.execute("DELETE FROM shifts WHERE owner_email = %s", (owner,))
+        conn.execute("DELETE FROM employees WHERE owner_email = %s", (owner,))
+        
         for s in shifts:
             emp_id = s.get("employee_id")
             if not emp_id: continue

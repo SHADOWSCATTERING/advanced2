@@ -30,10 +30,9 @@ import secrets
 import requests
 import urllib.parse
 
-from src.database import get_connection, init_db, seed_from_csv, DB_PATH, db_session, migrate_google_columns
+from src.database import get_connection, init_db, seed_from_csv, db_session, migrate_google_columns
 from src.fatigue_engine import FatigueEngine
 from src.ai_service import explain_fatigue_risk, explain_conflict, is_ai_configured, chat_with_ai
-
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(24).hex())
@@ -45,27 +44,17 @@ app.permanent_session_lifetime = timedelta(days=7)
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
 GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:5000/api/auth/google/callback").strip()
-# The redirect target in the browser (your frontend) after the OAuth dance finishes.
 GOOGLE_POST_LOGIN_REDIRECT = os.environ.get("GOOGLE_POST_LOGIN_REDIRECT", "/").strip()
 GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_ENDPOINT = "https://www.googleapis.com/oauth2/v3/userinfo"
-# spreadsheets.readonly lets us read a user's private sheets once they've
-# consented; openid/email/profile are what identify who they are.
 GOOGLE_SCOPES = "openid email profile https://www.googleapis.com/auth/spreadsheets.readonly"
 
-# Initialize database on startup if running on Vercel
-if "VERCEL" in os.environ:
-    if not os.path.exists(DB_PATH):
-        print("Vercel environment detected. Initializing database in /tmp...")
-        init_db(reset=True)
-        seed_from_csv()
-
-# Always make sure the Google-auth columns exist, even on a database that
-# was created before this feature was added (existing installs upgrade
-# automatically on their next restart, no manual migration step needed).
-if os.path.exists(DB_PATH):
+# Ensure the database tables and Google columns exist
+try:
     migrate_google_columns()
+except Exception as e:
+    print(f"Failed to migrate database columns on startup: {e}")
 
 # Enable simple CORS globally for local front-end testing
 @app.before_request
@@ -126,7 +115,7 @@ def verify_session():
             return error_response("Invalid session", 401)
             
         with db_session() as conn:
-            user = conn.execute("SELECT session_token FROM users WHERE email = ?", (email,)).fetchone()
+            user = conn.execute("SELECT session_token FROM users WHERE email = %s", (email,)).fetchone()
             if not user or user["session_token"] != token:
                 session.clear()
                 return error_response("Session expired or invalidated", 401)
@@ -150,7 +139,7 @@ def register():
     sec_answer_hash = generate_password_hash(payload["security_answer"].strip().lower())
 
     with db_session() as conn:
-        existing = conn.execute("SELECT email FROM users WHERE email = ?", (email,)).fetchone()
+        existing = conn.execute("SELECT email FROM users WHERE email = %s", (email,)).fetchone()
         if existing:
             return error_response("Email already registered", 409)
             
@@ -171,12 +160,12 @@ def login():
         
     email = payload["email"].strip().lower()
     with db_session() as conn:
-        user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        user = conn.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone()
         if not user or not check_password_hash(user["password_hash"], payload["password"]):
             return error_response("Invalid email or password", 401)
             
         session_token = secrets.token_urlsafe(32)
-        conn.execute("UPDATE users SET session_token = ? WHERE email = ?", (session_token, email))
+        conn.execute("UPDATE users SET session_token = %s WHERE email = %s", (session_token, email))
             
     session.permanent = True
     session["user_email"] = email
@@ -187,7 +176,7 @@ def login():
 def logout():
     if "user_email" in session:
         with db_session() as conn:
-            conn.execute("UPDATE users SET session_token = NULL WHERE email = ?", (session["user_email"],))
+            conn.execute("UPDATE users SET session_token = NULL WHERE email = %s", (session["user_email"],))
     session.clear()
     return jsonify({"message": "Logout successful"})
 
@@ -228,7 +217,7 @@ def forgot_password():
         return error_response("Too many attempts. Please try again later.", 429)
         
     with db_session() as conn:
-        user = conn.execute("SELECT security_question FROM users WHERE email = ?", (email,)).fetchone()
+        user = conn.execute("SELECT security_question FROM users WHERE email = %s", (email,)).fetchone()
         # Always return generic response to prevent enumeration
         question = user["security_question"] if user else "What was the name of your first pet?"
         return jsonify({"security_question": question})
@@ -246,7 +235,7 @@ def verify_security_answer():
         return error_response("Too many attempts. Please try again later.", 429)
 
     with db_session() as conn:
-        user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        user = conn.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone()
         if not user or not check_password_hash(user["security_answer_hash"], payload["security_answer"].strip().lower()):
             return error_response("Incorrect answer", 401)
             
@@ -275,7 +264,7 @@ def reset_password():
     serializer = URLSafeTimedSerializer(app.secret_key)
     
     with db_session() as conn:
-        user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        user = conn.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone()
         if not user:
             return error_response("Invalid request", 400)
             
@@ -290,7 +279,7 @@ def reset_password():
         password_hash = generate_password_hash(password)
         # Rotate session_token to invalidate existing sessions
         new_session_token = secrets.token_urlsafe(32)
-        conn.execute("UPDATE users SET password_hash = ?, session_token = ? WHERE email = ?", (password_hash, new_session_token, email))
+        conn.execute("UPDATE users SET password_hash = %s, session_token = %s WHERE email = %s", (password_hash, new_session_token, email))
         
     return jsonify({"message": "Password reset successful"})
 
@@ -364,20 +353,20 @@ def google_callback():
         last_name = info.get("family_name", "User").strip()
 
         with db_session() as conn:
-            existing = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+            existing = conn.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone()
             if existing:
                 # Keep existing refresh_token if Google didn't send a new one
                 # (it only sends one on the very first consent for this app).
                 if refresh_token:
                     conn.execute(
-                        """UPDATE users SET auth_provider='google', google_id=?,
+                        """UPDATE users SET auth_provider='google', google_id=%s,
                            google_access_token=?, google_refresh_token=?, google_token_expiry=?
                            WHERE email=?""",
                         (google_id, access_token, refresh_token, expiry, email),
                     )
                 else:
                     conn.execute(
-                        """UPDATE users SET auth_provider='google', google_id=?,
+                        """UPDATE users SET auth_provider='google', google_id=%s,
                            google_access_token=?, google_token_expiry=?
                            WHERE email=?""",
                         (google_id, access_token, expiry, email),
@@ -399,7 +388,7 @@ def google_callback():
                 )
 
             session_token = secrets.token_urlsafe(32)
-            conn.execute("UPDATE users SET session_token = ? WHERE email = ?", (session_token, email))
+            conn.execute("UPDATE users SET session_token = %s WHERE email = %s", (session_token, email))
 
         session.permanent = True
         session["user_email"] = email
@@ -416,7 +405,7 @@ def get_valid_google_token(email: str):
     never signed in with Google / has no usable token."""
     with db_session() as conn:
         user = conn.execute(
-            "SELECT google_access_token, google_refresh_token, google_token_expiry FROM users WHERE email = ?",
+            "SELECT google_access_token, google_refresh_token, google_token_expiry FROM users WHERE email = %s",
             (email,),
         ).fetchone()
 
@@ -452,7 +441,7 @@ def get_valid_google_token(email: str):
 
     with db_session() as conn:
         conn.execute(
-            "UPDATE users SET google_access_token = ?, google_token_expiry = ? WHERE email = ?",
+            "UPDATE users SET google_access_token = %s, google_token_expiry = %s WHERE email = %s",
             (new_access_token, new_expiry, email),
         )
     return new_access_token
@@ -479,7 +468,7 @@ def health():
 def list_employees():
     owner = get_owner()
     conn = get_connection()
-    rows = conn.execute("SELECT * FROM employees WHERE owner_email = ? ORDER BY employee_id", (owner,)).fetchall()
+    rows = conn.execute("SELECT * FROM employees WHERE owner_email = %s ORDER BY employee_id", (owner,)).fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
 
@@ -488,7 +477,7 @@ def list_employees():
 def get_employee(employee_id):
     owner = get_owner()
     conn = get_connection()
-    row = conn.execute("SELECT * FROM employees WHERE employee_id = ? AND owner_email = ?", (employee_id, owner)).fetchone()
+    row = conn.execute("SELECT * FROM employees WHERE employee_id = %s AND owner_email = %s", (employee_id, owner)).fetchone()
     conn.close()
     if not row:
         return error_response(f"Employee {employee_id} not found", 404)
@@ -539,7 +528,7 @@ def add_subjective_fatigue(emp_id):
     owner = get_owner()
     with db_session() as conn:
         # verify employee
-        emp = conn.execute("SELECT * FROM employees WHERE employee_id = ? AND owner_email = ?", (emp_id, owner)).fetchone()
+        emp = conn.execute("SELECT * FROM employees WHERE employee_id = %s AND owner_email = %s", (emp_id, owner)).fetchone()
         if not emp:
             return error_response(f"Employee {emp_id} not found", 404)
 
@@ -560,16 +549,16 @@ def list_shifts():
     end_date = request.args.get("end_date")
 
     owner = get_owner()
-    query = "SELECT * FROM shifts WHERE owner_email = ?"
+    query = "SELECT * FROM shifts WHERE owner_email = %s"
     params = [owner]
     if employee_id:
-        query += " AND employee_id = ?"
+        query += " AND employee_id = %s"
         params.append(employee_id)
     if start_date:
-        query += " AND shift_date >= ?"
+        query += " AND shift_date >= %s"
         params.append(start_date)
     if end_date:
-        query += " AND shift_date <= ?"
+        query += " AND shift_date <= %s"
         params.append(end_date)
     query += " ORDER BY shift_date, start_time"
 
@@ -583,7 +572,7 @@ def list_shifts():
 def get_shift(shift_id):
     owner = get_owner()
     conn = get_connection()
-    row = conn.execute("SELECT * FROM shifts WHERE shift_id = ? AND owner_email = ?", (shift_id, owner)).fetchone()
+    row = conn.execute("SELECT * FROM shifts WHERE shift_id = %s AND owner_email = %s", (shift_id, owner)).fetchone()
     conn.close()
     if not row:
         return error_response(f"Shift {shift_id} not found", 404)
@@ -698,7 +687,7 @@ def create_shift():
 @app.route("/api/shifts/<shift_id>", methods=["DELETE"])
 def delete_shift(shift_id):
     conn = get_connection()
-    cur = conn.execute("DELETE FROM shifts WHERE shift_id = ?", (shift_id,))
+    cur = conn.execute("DELETE FROM shifts WHERE shift_id = %s", (shift_id,))
     conn.commit()
     deleted = cur.rowcount
     conn.close()
@@ -714,7 +703,7 @@ def delete_shift(shift_id):
 def get_availability(employee_id):
     conn = get_connection()
     rows = conn.execute(
-        "SELECT * FROM availability WHERE employee_id = ? ORDER BY date", (employee_id,)
+        "SELECT * FROM availability WHERE employee_id = %s ORDER BY date", (employee_id,)
     ).fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
@@ -802,7 +791,7 @@ def dashboard_heatmap():
     eng = FatigueEngine(owner_email=owner)
     try:
         if not start_date or not end_date:
-            res = eng.conn.execute("SELECT MAX(shift_date) as max_date FROM shifts WHERE owner_email = ?", (owner,)).fetchone()
+            res = eng.conn.execute("SELECT MAX(shift_date) as max_date FROM shifts WHERE owner_email = %s", (owner,)).fetchone()
             if res and res["max_date"]:
                 max_date = datetime.strptime(res["max_date"], "%Y-%m-%d").date()
                 d1 = max_date - timedelta(days=6)
@@ -897,7 +886,7 @@ def daily_email_report():
     eng = FatigueEngine(owner_email=owner)
     try:
         summary = eng.dashboard_risk_summary()
-        employees = eng.conn.execute("SELECT employee_id FROM employees WHERE owner_email = ?", (owner,)).fetchall()
+        employees = eng.conn.execute("SELECT employee_id FROM employees WHERE owner_email = %s", (owner,)).fetchall()
         
         html_content = "<h2>Daily Fatigue Risk Report</h2>"
         html_content += f"<p><strong>High Risk:</strong> {summary.get('high_risk', 0)} | <strong>Medium Risk:</strong> {summary.get('medium_risk', 0)} | <strong>Low Risk:</strong> {summary.get('low_risk', 0)}</p>"
@@ -1060,7 +1049,7 @@ def link_sheet():
     now_iso = datetime.now(timezone.utc).isoformat()
     with db_session() as conn:
         conn.execute(
-            "UPDATE users SET linked_sheet_id = ?, linked_sheet_name = ?, linked_sheet_last_synced = ? WHERE email = ?",
+            "UPDATE users SET linked_sheet_id = %s, linked_sheet_name = %s, linked_sheet_last_synced = %s WHERE email = %s",
             (sheet_id, sheet_title, now_iso, owner),
         )
 
@@ -1084,7 +1073,7 @@ def sync_linked_sheet():
         return error_response("Please log in.", 401)
 
     with db_session() as conn:
-        user = conn.execute("SELECT linked_sheet_id, linked_sheet_name FROM users WHERE email = ?", (owner,)).fetchone()
+        user = conn.execute("SELECT linked_sheet_id, linked_sheet_name FROM users WHERE email = %s", (owner,)).fetchone()
 
     if not user or not user["linked_sheet_id"]:
         return error_response("No Google Sheet is linked to this account yet.", 400)
@@ -1102,7 +1091,7 @@ def sync_linked_sheet():
     result = _process_shifts_data(shifts, owner)
     now_iso = datetime.now(timezone.utc).isoformat()
     with db_session() as conn:
-        conn.execute("UPDATE users SET linked_sheet_last_synced = ? WHERE email = ?", (now_iso, owner))
+        conn.execute("UPDATE users SET linked_sheet_last_synced = %s WHERE email = %s", (now_iso, owner))
 
     if isinstance(result, tuple):
         body, status = result
@@ -1122,7 +1111,7 @@ def unlink_sheet():
         return error_response("Please log in.", 401)
     with db_session() as conn:
         conn.execute(
-            "UPDATE users SET linked_sheet_id = NULL, linked_sheet_name = NULL, linked_sheet_last_synced = NULL WHERE email = ?",
+            "UPDATE users SET linked_sheet_id = NULL, linked_sheet_name = NULL, linked_sheet_last_synced = NULL WHERE email = %s",
             (owner,),
         )
     return jsonify({"message": "Sheet unlinked."})
@@ -1135,7 +1124,7 @@ def sheet_status():
         return jsonify({"linked": False})
     with db_session() as conn:
         user = conn.execute(
-            "SELECT linked_sheet_id, linked_sheet_name, linked_sheet_last_synced, auth_provider FROM users WHERE email = ?",
+            "SELECT linked_sheet_id, linked_sheet_name, linked_sheet_last_synced, auth_provider FROM users WHERE email = %s",
             (owner,),
         ).fetchone()
     if not user or not user["linked_sheet_id"]:
@@ -1182,7 +1171,7 @@ def _process_shifts_data(shifts, owner):
             emp_id = s.get("employee_id")
             if not emp_id: continue
             # if employee doesn't exist for this owner, create a default one
-            emp = conn.execute("SELECT * FROM employees WHERE employee_id = ? AND owner_email = ?", (emp_id, owner)).fetchone()
+            emp = conn.execute("SELECT * FROM employees WHERE employee_id = %s AND owner_email = %s", (emp_id, owner)).fetchone()
             if not emp:
                 conn.execute(
                     """INSERT INTO employees (employee_id, owner_email, name, role, department)

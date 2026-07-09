@@ -842,11 +842,14 @@ def ai_chat():
 
     owner = get_owner()
     engine = FatigueEngine(owner_email=owner)
-    analysis = engine.analyze_employee(employee_id)
-    safer_alternatives = [] # To save time/compute we skip alternatives in chat payload for now
+    try:
+        analysis = engine.analyze_employee(employee_id)
+        safer_alternatives = [] # To save time/compute we skip alternatives in chat payload for now
 
-    reply = chat_with_ai(analysis, safer_alternatives, history, message)
-    return jsonify({"reply": reply})
+        reply = chat_with_ai(analysis, safer_alternatives, history, message)
+        return jsonify({"reply": reply})
+    finally:
+        engine.close()
 
 # ---------------------------------------------------------------------
 # Reports

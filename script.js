@@ -815,7 +815,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function checkHealth() {
         try {
-            const res = await fetchWithTimeout(`${API_BASE}/api/health`, { timeout: 8000 });
+            const res = await fetchWithTimeout(`${API_BASE}/api/health`, { timeout: 15000 });
             if (!res.ok) throw new Error("API unhealthy");
             const data = await res.json();
             
@@ -853,7 +853,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         try {
-            const res = await fetchWithTimeout(`${API_BASE}/api/employees`, { timeout: 8000 });
+            const res = await fetchWithTimeout(`${API_BASE}/api/employees`, { timeout: 15000 });
             if (!res.ok) throw new Error("Could not load employees");
             employeesData = await res.json();
             
@@ -866,7 +866,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Get dashboard stats if database is initialized
             let riskSummary = {};
             try {
-                const dashboardRes = await fetchWithTimeout(`${API_BASE}/api/dashboard/risk-summary`, { timeout: 10000 });
+                const dashboardRes = await fetchWithTimeout(`${API_BASE}/api/dashboard/risk-summary`, { timeout: 15000 });
                 if (dashboardRes.ok) {
                     riskSummary = await dashboardRes.json();
                 }
@@ -876,8 +876,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             renderEmployeeList(riskSummary.employee_risks || []);
         } catch (err) {
-            console.error("Error loading employees from DB, falling back to demo data:", err);
-            loadDemoData();
+            console.error("Error loading employees from DB:", err);
+            if (typeof currentUser === 'undefined' || !currentUser) {
+                console.log("Not logged in, falling back to demo data.");
+                loadDemoData();
+            } else {
+                console.log("Logged in but failed to load data. The DB might be busy.");
+                renderEmployeeList([]);
+            }
         }
     }
 

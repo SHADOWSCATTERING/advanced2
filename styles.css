@@ -713,10 +713,6 @@ footer {
         display: flex;
     }
     
-    #btn-account-icon {
-        display: none;
-    }
-    
     .hero h1 {
         font-size: 2.5rem;
     }

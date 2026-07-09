@@ -945,12 +945,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         try {
             // Fetch fatigue risk detail
-            const riskRes = await fetch(`${API_BASE}/api/employees/${empId}/fatigue-risk`);
+            const riskRes = await fetchWithTimeout(`${API_BASE}/api/employees/${empId}/fatigue-risk`, { timeout: 15000 });
             if (!riskRes.ok) throw new Error("Failed to load fatigue risk");
             const riskData = await riskRes.json();
 
             // Fetch schedule
-            const scheduleRes = await fetch(`${API_BASE}/api/employees/${empId}/schedule`);
+            const scheduleRes = await fetchWithTimeout(`${API_BASE}/api/employees/${empId}/schedule`, { timeout: 15000 });
             if (!scheduleRes.ok) throw new Error("Failed to load employee schedule");
             const scheduleData = await scheduleRes.json();
 
@@ -959,12 +959,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             renderEmployeeDetails(riskData, scheduleData);
             
-            // Asynchronously fetch AI Explanation
-            let urlAi = `${API_BASE}/api/employees/${empId}/ai-explanation`;
-            if (dateStart.value && dateEnd.value) {
-                urlAi += `?start_date=${dateStart.value}&end_date=${dateEnd.value}`;
-            }
-            fetchAiExplanation(urlAi);
+
         } catch (err) {
             console.error(err);
             loader.classList.add('hidden');
@@ -1019,12 +1014,32 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        // Render AI explanation box initial loading state
-        detailAiSource.textContent = 'Google Gemini';
-        detailAiSource.className = 'ai-source-badge ai';
-        detailAiExplanation.innerHTML = '<div class="loading-spinner" style="display:inline-block; margin-right: 0.5rem; width: 14px; height: 14px; border-width: 2px;"></div> Generating AI insights...';
-        groupAiUrgent.classList.add('hidden');
-        groupAiRec.classList.add('hidden');
+        // Render AI explanation from riskData
+        const ai = riskData.ai_explanation || {};
+        
+        if (ai.source === 'ai') {
+            detailAiSource.textContent = 'Google Gemini';
+            detailAiSource.className = 'ai-source-badge ai';
+        } else {
+            detailAiSource.textContent = 'Rule Explainer (Fallback)';
+            detailAiSource.className = 'ai-source-badge';
+        }
+        
+        detailAiExplanation.textContent = ai.explanation || 'No explanation available.';
+
+        if (ai.most_urgent_issue && ai.most_urgent_issue !== 'None detected.') {
+            groupAiUrgent.classList.remove('hidden');
+            detailAiUrgent.textContent = ai.most_urgent_issue;
+        } else {
+            groupAiUrgent.classList.add('hidden');
+        }
+
+        if (ai.recommendation) {
+            groupAiRec.classList.remove('hidden');
+            detailAiRecommendation.textContent = ai.recommendation;
+        } else {
+            groupAiRec.classList.add('hidden');
+        }
 
 
         // Reset AI Chat

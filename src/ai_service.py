@@ -29,7 +29,7 @@ import requests
 
 GEMINI_MODEL = "gemini-2.5-flash"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-REQUEST_TIMEOUT_SECONDS = 20
+REQUEST_TIMEOUT_SECONDS = 6
 
 SYSTEM_PROMPT = (
     "You are a workforce safety assistant embedded in a shift-planning tool. "
@@ -73,25 +73,19 @@ def _call_gemini(analysis: dict, safer_alternatives: list = None) -> dict | None
         "content-type": "application/json",
     }
 
-    import time
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            resp = requests.post(url, headers=headers, json=payload,
-                                  timeout=REQUEST_TIMEOUT_SECONDS)
-            resp.raise_for_status()
-            data = resp.json()
-            raw_text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip()
-            raw_text = raw_text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-            parsed = json.loads(raw_text)
-            parsed["source"] = "ai"
-            return parsed
-        except Exception as exc:
-            print(f"[ai_service] Gemini API call failed (attempt {attempt+1}): {exc}")
-            if attempt < max_retries - 1:
-                time.sleep(1)
-            else:
-                return None
+    try:
+        resp = requests.post(url, headers=headers, json=payload,
+                              timeout=REQUEST_TIMEOUT_SECONDS)
+        resp.raise_for_status()
+        data = resp.json()
+        raw_text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip()
+        raw_text = raw_text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        parsed = json.loads(raw_text)
+        parsed["source"] = "ai"
+        return parsed
+    except Exception as exc:
+        print(f"[ai_service] Gemini API call failed: {exc}")
+        return None
 
 
 def _fallback_explanation(analysis: dict, safer_alternatives: list = None) -> dict:

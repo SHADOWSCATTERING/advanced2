@@ -21,17 +21,17 @@
     /* Risk Tier Colors (M3 Refined) */
     --accent-safe: #93f0a9; /* Soft Green */
     --accent-safe-dim: rgba(147, 240, 169, 0.15);
-    --accent-caution: #ffb4a8; /* M3 Error/Caution */
-    --accent-caution-dim: rgba(255, 180, 168, 0.15);
-    --accent-critical: #ffb4a8; /* Keeping consistent with existing IDs but mapped to M3 */
-    --accent-critical-dim: rgba(255, 180, 168, 0.15);
+    --accent-caution: #f97316; /* Orange */
+    --accent-caution-dim: rgba(249, 115, 22, 0.15);
+    --accent-critical: #b91c1c; /* Dark Red */
+    --accent-critical-dim: rgba(185, 28, 28, 0.15);
 
     /* Backwards compatibility aliases */
     --accent-green: var(--accent-safe);
     --accent-green-dim: var(--accent-safe-dim);
-    --accent-red: #ffb4a8;
-    --accent-red-dim: rgba(255, 180, 168, 0.15);
-    --accent-orange: #ffb4a8; /* Map to error tone */
+    --accent-red: var(--accent-critical);
+    --accent-red-dim: var(--accent-critical-dim);
+    --accent-orange: var(--accent-caution);
 
     /* Metrics & Dimensions (M3 Radius Scale) */
     --radius-xs: 4px;

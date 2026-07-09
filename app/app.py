@@ -1008,8 +1008,28 @@ def _fetch_sheet_rows(sheet_id: str, owner: str):
 
 def _extract_sheet_id(raw: str) -> str:
     raw = (raw or "").strip()
+    if not raw:
+        return ""
+        
+    # Standard format: /d/ID
     match = re.search(r"/d/([a-zA-Z0-9-_]+)", raw)
-    return match.group(1) if match else raw
+    if match:
+        # Handle the edge case of 'e' which is for published sheets
+        if match.group(1) == "e":
+            raise ValueError("Published sheet URLs (starting with /d/e/) are not supported. Please use the standard 'Share' link.")
+        return match.group(1)
+        
+    # Old format or query param: key=ID or id=ID
+    match = re.search(r"[?&](?:key|id)=([a-zA-Z0-9-_]+)", raw)
+    if match:
+        return match.group(1)
+        
+    # If it's still a full URL and didn't match, it's invalid
+    if raw.startswith("http://") or raw.startswith("https://"):
+        raise ValueError("Invalid Google Sheets URL format. Please paste a standard Google Sheets link (e.g., https://docs.google.com/spreadsheets/d/...).")
+        
+    # Otherwise, assume the user just pasted the raw ID directly
+    return raw
 
 
 @app.route("/api/shifts/import-sheet", methods=["POST"])

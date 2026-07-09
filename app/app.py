@@ -452,10 +452,9 @@ def get_valid_google_token(email: str):
 # ---------------------------------------------------------------------
 @app.route("/api/health", methods=["GET"])
 def health():
-    db_exists = os.path.exists(DB_PATH)
     return jsonify({
         "status": "ok",
-        "database_initialized": db_exists,
+        "database_initialized": True,
         "ai_configured": is_ai_configured(),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })

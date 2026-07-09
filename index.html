@@ -706,13 +706,20 @@
                     <a href="#" id="link-back-login-1" style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; text-decoration: underline;">Back to Log In</a>
                 </form>
 
-                <!-- Forgot Password Form (Step 2) -->
+                <!-- Forgot Password Form (Step 2: Answer Question) -->
                 <form id="forgot-form-2" class="hidden" style="display: flex; flex-direction: column; gap: 0.8rem;">
                     <p id="forgot-sq-display" style="font-size: 0.85rem; color: var(--text-secondary); text-align: center; font-style: italic;"></p>
                     <input type="text" id="forgot-sa" placeholder="Security Answer" required class="form-control" style="width: 100%;">
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Verify Answer</button>
+                    <a href="#" id="link-back-login-2" style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; text-decoration: underline;">Back to Log In</a>
+                </form>
+
+                <!-- Forgot Password Form (Step 3: Reset Password) -->
+                <form id="forgot-form-3" class="hidden" style="display: flex; flex-direction: column; gap: 0.8rem;">
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); text-align: center;">Answer verified. Please set a new password.</p>
                     <input type="password" id="forgot-new-password" placeholder="New Password (min 8 chars, 1 number)" required class="form-control" style="width: 100%;">
                     <button type="submit" class="btn btn-primary" style="width: 100%;">Reset Password</button>
-                    <a href="#" id="link-back-login-2" style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; text-decoration: underline;">Back to Log In</a>
+                    <a href="#" id="link-back-login-3" style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; text-decoration: underline;">Back to Log In</a>
                 </form>
             </div>
         </div>

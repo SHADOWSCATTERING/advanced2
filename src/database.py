@@ -106,6 +106,7 @@ GOOGLE_AUTH_COLUMNS = [
     ("linked_sheet_id",          "TEXT"),
     ("linked_sheet_name",        "TEXT"),
     ("linked_sheet_last_synced", "TEXT"),   # ISO 8601 UTC timestamp
+    ("session_token",            "TEXT"),
 ]
 
 

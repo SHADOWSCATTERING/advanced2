@@ -1,5 +1,5 @@
 // --- Auth & CSV Upload Logic ---
-let currentUserEmail = localStorage.getItem('fatiguex_user_email') || null;
+let currentUserEmail = null;
 
 // Override global fetch to append X-User-Email and ensure cookies are sent
 const originalFetch = window.fetch;
@@ -10,18 +10,13 @@ window.fetch = async function() {
     // Ensure HTTP-only cookies are sent with requests
     config.credentials = 'include';
     
-    const newHeaders = new Headers(config.headers || {});
-    if (currentUserEmail) {
-        newHeaders.set('X-User-Email', currentUserEmail);
-    }
-    config.headers = newHeaders;
+    // We no longer manually send X-User-Email because backend relies on the secure session cookie.
     
     const response = await originalFetch(resource, config);
     
     // Globally intercept 401 to handle expired sessions gracefully
     if (response.status === 401 && resource !== '/api/auth/login' && resource !== '/api/auth/session') {
         currentUserEmail = null;
-        localStorage.removeItem('fatiguex_user_email');
         const authSection = document.getElementById('auth-section');
         const authModal = document.getElementById('auth-modal');
         if (authSection) authSection.classList.remove('hidden');
@@ -33,12 +28,29 @@ window.fetch = async function() {
                 authErrorMsg.classList.remove('hidden');
             }
         }
+        if (typeof updateAuthUI === 'function') updateAuthUI();
     }
     
     return response;
 };
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Check session on load
+    try {
+        const res = await window.fetch('/api/auth/session');
+        if (res.ok) {
+            const data = await res.json();
+            currentUserEmail = data.email;
+            // Delay UI update slightly so elements are guaranteed to be initialized
+            setTimeout(() => {
+                if (typeof updateAuthUI === 'function') updateAuthUI();
+                if (typeof loadEmployees === 'function') loadEmployees();
+            }, 0);
+        }
+    } catch (e) {
+        console.error("Session check failed", e);
+    }
+
     // Auth DOM Elements
     const authSection = document.getElementById('auth-section');
     const uploadSection = document.getElementById('upload-section');
@@ -92,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const authErrorMsg = document.getElementById('auth-error-msg');
     const authSuccessMsg = document.getElementById('auth-success-msg');
-    const authForms = ['login-form', 'register-form', 'forgot-form-1', 'forgot-form-2'];
+    const authForms = ['login-form', 'register-form', 'forgot-form-1', 'forgot-form-2', 'forgot-form-3'];
     
     function showAuthForm(formId) {
         authForms.forEach(id => {
@@ -128,6 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('link-forgot-password')?.addEventListener('click', (e) => { e.preventDefault(); showAuthForm('forgot-form-1'); });
     document.getElementById('link-back-login-1')?.addEventListener('click', (e) => { e.preventDefault(); showAuthForm('login-form'); });
     document.getElementById('link-back-login-2')?.addEventListener('click', (e) => { e.preventDefault(); showAuthForm('login-form'); });
+    document.getElementById('link-back-login-3')?.addEventListener('click', (e) => { e.preventDefault(); showAuthForm('login-form'); });
 
     // Handle Google Sign-in URL parameters
     const urlParams = new URLSearchParams(window.location.search);
@@ -140,6 +153,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (urlParams.get('google_login') === 'success') {
         window.history.replaceState({}, document.title, window.location.pathname);
     }
+
+    // Google Login Button
+    document.getElementById('btn-google-login')?.addEventListener('click', () => {
+        window.location.href = '/api/auth/google/login';
+    });
 
 
     // API Handlers
@@ -157,7 +175,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!res.ok) throw new Error(data.error);
             
             currentUserEmail = data.email;
-            localStorage.setItem('fatiguex_user_email', currentUserEmail);
             updateAuthUI();
             closeModal();
             if (typeof loadEmployees === 'function') loadEmployees();
@@ -214,11 +231,35 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    let resetToken = '';
+    
     document.getElementById('forgot-form-2')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const payload = {
             email: resetEmail,
-            security_answer: document.getElementById('forgot-sa').value.trim(),
+            security_answer: document.getElementById('forgot-sa').value.trim()
+        };
+        try {
+            const res = await window.fetch('/api/auth/verify-security-answer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            
+            resetToken = data.reset_token;
+            showAuthForm('forgot-form-3');
+        } catch (err) {
+            showAuthMsg(err.message, true);
+        }
+    });
+
+    document.getElementById('forgot-form-3')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            email: resetEmail,
+            reset_token: resetToken,
             new_password: document.getElementById('forgot-new-password').value
         };
         try {
@@ -245,7 +286,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error("Logout failed", e);
             }
             currentUserEmail = null;
-            localStorage.removeItem('fatiguex_user_email');
             updateAuthUI();
             closeModal();
             stopSheetPolling();

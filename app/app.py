@@ -93,8 +93,10 @@ def error_response(message: str, status: int = 400):
 
 
 def get_owner():
+    # Rely entirely on the secure session cookie for authenticated users
     if "user_email" in session:
         return session["user_email"]
+    # Fallback to demo mode only if explicitly requested and no session exists
     return request.headers.get("X-User-Email", "demo")
 
 
@@ -109,6 +111,25 @@ def require_fields(payload: dict, fields: list):
 # Auth
 # ---------------------------------------------------------------------
 import re
+
+@app.before_request
+def verify_session():
+    if request.method == "OPTIONS":
+        return
+    
+    # If the user has a session cookie, validate it against the database
+    if "user_email" in session:
+        email = session["user_email"]
+        token = session.get("session_token")
+        if not token:
+            session.clear()
+            return error_response("Invalid session", 401)
+            
+        with db_session() as conn:
+            user = conn.execute("SELECT session_token FROM users WHERE email = ?", (email,)).fetchone()
+            if not user or user["session_token"] != token:
+                session.clear()
+                return error_response("Session expired or invalidated", 401)
 
 @app.route("/api/auth/register", methods=["POST"])
 def register():
@@ -154,17 +175,25 @@ def login():
         if not user or not check_password_hash(user["password_hash"], payload["password"]):
             return error_response("Invalid email or password", 401)
             
+        session_token = secrets.token_urlsafe(32)
+        conn.execute("UPDATE users SET session_token = ? WHERE email = ?", (session_token, email))
+            
     session.permanent = True
     session["user_email"] = email
+    session["session_token"] = session_token
     return jsonify({"message": "Login successful", "email": email})
 
 @app.route("/api/auth/logout", methods=["POST"])
 def logout():
+    if "user_email" in session:
+        with db_session() as conn:
+            conn.execute("UPDATE users SET session_token = NULL WHERE email = ?", (session["user_email"],))
     session.clear()
     return jsonify({"message": "Logout successful"})
 
 @app.route("/api/auth/session", methods=["GET"])
 def check_session():
+    # If they reach here and have user_email, before_request has already validated them
     if "user_email" in session:
         return jsonify({"valid": True, "email": session["user_email"]})
     return jsonify({"valid": False}), 401
@@ -205,30 +234,63 @@ def forgot_password():
         return jsonify({"security_question": question})
 
 
+@app.route("/api/auth/verify-security-answer", methods=["POST"])
+def verify_security_answer():
+    payload = request.get_json(force=True, silent=True) or {}
+    err = require_fields(payload, ["email", "security_answer"])
+    if err:
+        return error_response(err)
+        
+    email = payload["email"].strip().lower()
+    if is_rate_limited(email):
+        return error_response("Too many attempts. Please try again later.", 429)
+
+    with db_session() as conn:
+        user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        if not user or not check_password_hash(user["security_answer_hash"], payload["security_answer"].strip().lower()):
+            return error_response("Incorrect answer", 401)
+            
+        from itsdangerous import URLSafeTimedSerializer
+        serializer = URLSafeTimedSerializer(app.secret_key)
+        # Include current password_hash in token to make it single-use (invalidates once password changes)
+        token_data = {"email": email, "hash_prefix": user["password_hash"][:10]}
+        reset_token = serializer.dumps(token_data, salt="password-reset")
+        
+    return jsonify({"reset_token": reset_token})
+
 @app.route("/api/auth/reset-password", methods=["POST"])
 def reset_password():
     payload = request.get_json(force=True, silent=True) or {}
-    err = require_fields(payload, ["email", "security_answer", "new_password"])
+    err = require_fields(payload, ["email", "reset_token", "new_password"])
     if err:
         return error_response(err)
         
     email = payload["email"].strip().lower()
     password = payload["new_password"]
     
-    if is_rate_limited(email):
-        return error_response("Too many attempts. Please try again later.", 429)
-        
     if len(password) < 8 or not any(char.isdigit() for char in password):
         return error_response("Password must be at least 8 characters and contain at least one number")
-
+        
+    from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
+    serializer = URLSafeTimedSerializer(app.secret_key)
+    
     with db_session() as conn:
         user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
-        if not user or not check_password_hash(user["security_answer_hash"], payload["security_answer"].strip().lower()):
-            # Important: We don't reveal if the email exists, just a generic invalid error.
-            return error_response("Incorrect answer", 401)
+        if not user:
+            return error_response("Invalid request", 400)
+            
+        try:
+            # Max age of 15 minutes (900 seconds)
+            token_data = serializer.loads(payload["reset_token"], salt="password-reset", max_age=900)
+            if token_data["email"] != email or token_data["hash_prefix"] != user["password_hash"][:10]:
+                return error_response("Invalid or used token", 401)
+        except (SignatureExpired, BadSignature):
+            return error_response("Invalid or expired token", 401)
             
         password_hash = generate_password_hash(password)
-        conn.execute("UPDATE users SET password_hash = ? WHERE email = ?", (password_hash, email))
+        # Rotate session_token to invalidate existing sessions
+        new_session_token = secrets.token_urlsafe(32)
+        conn.execute("UPDATE users SET password_hash = ?, session_token = ? WHERE email = ?", (password_hash, new_session_token, email))
         
     return jsonify({"message": "Password reset successful"})
 
@@ -336,8 +398,12 @@ def google_callback():
                      google_id, access_token, refresh_token, expiry),
                 )
 
+            session_token = secrets.token_urlsafe(32)
+            conn.execute("UPDATE users SET session_token = ? WHERE email = ?", (session_token, email))
+
         session.permanent = True
         session["user_email"] = email
+        session["session_token"] = session_token
         return redirect(f"{GOOGLE_POST_LOGIN_REDIRECT}?google_login=success")
 
     except Exception as exc:

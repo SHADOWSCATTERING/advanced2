@@ -1154,7 +1154,7 @@ def upload_csv():
         return error_response("No file selected.")
 
     try:
-        stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
+        stream = io.StringIO(file.stream.read().decode("utf-8-sig"), newline=None)
         reader = csv.DictReader(stream)
         shifts = list(reader)
 

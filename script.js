@@ -649,6 +649,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Intersection Observer for fade-in animations on scroll
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const observerOptions = {
         root: null,
         rootMargin: '0px',
@@ -658,8 +659,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     const observer = new IntersectionObserver((entries, observer) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
-                entry.target.style.opacity = '1';
-                entry.target.style.transform = 'translateY(0)';
+                // Add visible class for standard fades
+                if (entry.target.classList.contains('fade-in-up')) {
+                    entry.target.classList.add('visible');
+                }
+                
+                // Add typing class for typewriter elements
+                if (entry.target.classList.contains('typewriter-reveal')) {
+                    if (!prefersReducedMotion) {
+                        entry.target.classList.add('typing');
+                        // Remove caret after animation finishes
+                        setTimeout(() => entry.target.classList.add('typed'), 1500);
+                    }
+                }
+                
                 observer.unobserve(entry.target);
             }
         });
@@ -667,11 +680,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Apply basic fade up to sections
     document.querySelectorAll('section:not(.hero) .container').forEach(section => {
-        section.style.opacity = '0';
-        section.style.transform = 'translateY(30px)';
-        section.style.transition = 'opacity 0.8s ease-out, transform 0.8s ease-out';
+        section.classList.add('fade-in-up');
         observer.observe(section);
     });
+
+    // Observe specific elements
+    document.querySelectorAll('.typewriter-reveal').forEach(el => observer.observe(el));
+
+    // Parallax logic for Hero Background (Desktop only)
+    if (!prefersReducedMotion && window.innerWidth > 1024) {
+        const heroSection = document.querySelector('.hero');
+        const ambientBg = document.querySelector('.ambient-bg');
+        
+        if (heroSection && ambientBg) {
+            window.addEventListener('mousemove', (e) => {
+                const x = (e.clientX / window.innerWidth - 0.5) * 20; // max 20px
+                const y = (e.clientY / window.innerHeight - 0.5) * 20;
+                // We use CSS variables to shift the background slightly without layout thrashing
+                ambientBg.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+            });
+        }
+    }
 
     // Interactive Risk Assessment Card Simulation
     const riskCard = document.getElementById('dynamic-risk-card');

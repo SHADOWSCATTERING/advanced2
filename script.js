@@ -847,11 +847,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    async function loadEmployees(forceDemo = false) {
-        if (forceDemo) {
-            return loadDemoData();
-        }
-        
+    async function loadEmployees() {
         try {
             const res = await fetchWithTimeout(`${API_BASE}/api/employees`, { timeout: 15000 });
             if (!res.ok) throw new Error("Could not load employees");
@@ -877,34 +873,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderEmployeeList(riskSummary.employee_risks || []);
         } catch (err) {
             console.error("Error loading employees from DB:", err);
-            if (typeof currentUser === 'undefined' || !currentUser) {
-                console.log("Not logged in, falling back to demo data.");
-                loadDemoData();
-            } else {
-                console.log("Logged in but failed to load data. The DB might be busy.");
-                renderEmployeeList([]);
-            }
+            renderEmployeeList([]);
         }
-    }
-
-    function loadDemoData() {
-        console.log("Loading demo data as fallback...");
-        employeesData = [
-            { employee_id: "E001", name: "Jane Smith (Demo)", role: "Senior Nurse", department: "Emergency", contracted_hours: 40, max_weekly_hours: 48, min_rest_hours_required: 11 },
-            { employee_id: "E004", name: "Sarah Connor (Demo)", role: "Charge Nurse", department: "Emergency", contracted_hours: 40, max_weekly_hours: 48, min_rest_hours_required: 11 },
-            { employee_id: "E003", name: "Alice Johnson (Demo)", role: "Paramedic", department: "Emergency", contracted_hours: 36, max_weekly_hours: 48, min_rest_hours_required: 11 },
-            { employee_id: "E002", name: "John Doe (Demo)", role: "Security Officer", department: "Security", contracted_hours: 40, max_weekly_hours: 48, min_rest_hours_required: 11 }
-        ];
-        
-        const demoRiskSummary = {
-            employee_risks: [
-                { employee_id: "E001", risk_level: "Critical", fatigue_score: 85 },
-                { employee_id: "E004", risk_level: "High", fatigue_score: 70 },
-                { employee_id: "E003", risk_level: "Moderate", fatigue_score: 45 },
-                { employee_id: "E002", risk_level: "Low", fatigue_score: 15 }
-            ]
-        };
-        renderEmployeeList(demoRiskSummary.employee_risks);
     }
 
     function renderEmployeeList(riskList = []) {
@@ -988,6 +958,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             panelDetailsContent.classList.remove('hidden');
 
             renderEmployeeDetails(riskData, scheduleData);
+            
+            // Asynchronously fetch AI Explanation
+            fetchAiExplanation(empId);
         } catch (err) {
             console.error(err);
             loader.classList.add('hidden');
@@ -1042,31 +1015,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        // Render AI explanation box
-        const ai = riskData.ai_explanation || {};
-        if (ai.source === 'ai') {
-            detailAiSource.textContent = 'Google Gemini';
-            detailAiSource.className = 'ai-source-badge ai';
-        } else {
-            detailAiSource.textContent = 'Rule Explainer (Fallback)';
-            detailAiSource.className = 'ai-source-badge';
-        }
+        // Render AI explanation box initial loading state
+        detailAiSource.textContent = 'Google Gemini';
+        detailAiSource.className = 'ai-source-badge ai';
+        detailAiExplanation.innerHTML = '<div class="loading-spinner" style="display:inline-block; margin-right: 0.5rem; width: 14px; height: 14px; border-width: 2px;"></div> Generating AI insights...';
+        groupAiUrgent.classList.add('hidden');
+        groupAiRec.classList.add('hidden');
 
-        detailAiExplanation.textContent = ai.explanation || 'No explanation available.';
-        
-        if (ai.most_urgent_issue && ai.most_urgent_issue !== 'None detected.') {
-            groupAiUrgent.classList.remove('hidden');
-            detailAiUrgent.textContent = ai.most_urgent_issue;
-        } else {
-            groupAiUrgent.classList.add('hidden');
-        }
-
-        if (ai.recommendation) {
-            groupAiRec.classList.remove('hidden');
-            detailAiRecommendation.textContent = ai.recommendation;
-        } else {
-            groupAiRec.classList.add('hidden');
-        }
 
         // Reset AI Chat
         aiChatHistory = [];

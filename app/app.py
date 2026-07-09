@@ -35,8 +35,20 @@ from src.fatigue_engine import FatigueEngine
 from src.ai_service import explain_fatigue_risk, explain_conflict, is_ai_configured, chat_with_ai
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(24).hex())
+app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "super-secret-default-key")
+app.config["SESSION_COOKIE_SECURE"] = True
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.permanent_session_lifetime = timedelta(days=7)
+
+try:
+    with db_session() as conn:
+        emp = conn.execute("SELECT 1 FROM employees WHERE owner_email = 'demo' LIMIT 1").fetchone()
+        if not emp:
+            print("Seeding demo data...", flush=True)
+            seed_from_csv()
+except Exception as e:
+    print(f"Warning: Could not check/seed demo data: {e}", flush=True)
 
 # ---------------------------------------------------------------------
 # Google OAuth config (Sign in with Google + Sheets read access)
@@ -746,12 +758,38 @@ def employee_fatigue_risk(employee_id):
                     employee_id, last_shift["shift_date"],
                     last_shift["start_time"], last_shift["end_time"], last_shift.get("shift_type"),
                 )
-        ai_explanation = explain_fatigue_risk(analysis, alternatives)
     finally:
         eng.close()
 
-    return jsonify({**analysis, "safer_alternatives": alternatives, "ai_explanation": ai_explanation})
+    # Note: AI explanation is fetched separately via /api/employees/<id>/ai-explanation for speed
+    return jsonify({**analysis, "safer_alternatives": alternatives, "ai_explanation": ""})
 
+@app.route("/api/employees/<employee_id>/ai-explanation", methods=["GET"])
+def employee_ai_explanation(employee_id):
+    """Generates the AI explanation asynchronously to keep the main UI fast."""
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+    owner = get_owner()
+    eng = FatigueEngine(owner_email=owner)
+    try:
+        analysis = eng.analyze_employee(employee_id, start_date, end_date)
+        if "error" in analysis:
+            return error_response(analysis["error"], 404)
+        
+        alternatives = []
+        if analysis["violations"]:
+            shifts = eng.get_shifts_for_employee(employee_id, start_date, end_date)
+            if shifts:
+                last_shift = shifts[-1]
+                alternatives = eng.suggest_safer_alternatives(
+                    employee_id, last_shift["shift_date"],
+                    last_shift["start_time"], last_shift["end_time"], last_shift.get("shift_type"),
+                )
+        ai_explanation = explain_fatigue_risk(analysis, alternatives)
+    finally:
+        eng.close()
+    
+    return jsonify({"ai_explanation": ai_explanation})
 
 @app.route("/api/employees/<employee_id>/schedule", methods=["GET"])
 def employee_schedule(employee_id):

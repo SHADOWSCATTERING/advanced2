@@ -239,14 +239,16 @@ class FatigueEngine:
         return flagged
 
     # ---------- composite analysis ----------
-    def analyze_employee(self, employee_id: str, start_date: str = None, end_date: str = None) -> dict:
+    def analyze_employee(self, employee_id: str, start_date: str = None, end_date: str = None, shifts: list = None, employee: dict = None) -> dict:
         """Full fatigue-risk analysis for one employee across an optional
         date window (defaults to all shifts on file)."""
-        employee = self.get_employee(employee_id)
+        if employee is None:
+            employee = self.get_employee(employee_id)
         if not employee:
             return {"error": f"Employee {employee_id} not found"}
 
-        shifts = self.get_shifts_for_employee(employee_id, start_date, end_date)
+        if shifts is None:
+            shifts = self.get_shifts_for_employee(employee_id, start_date, end_date)
         violations = []
         score = 0
 
@@ -540,7 +542,7 @@ class FatigueEngine:
         }
 
     def heatmap_data(self, start_date: str, end_date: str) -> dict:
-        employees = self.conn.execute("SELECT employee_id, name FROM employees WHERE owner_email = %s", (self.owner_email,)).fetchall()
+        employees = self.conn.execute("SELECT * FROM employees WHERE owner_email = %s", (self.owner_email,)).fetchall()
         
         d1 = datetime.strptime(start_date, "%Y-%m-%d").date()
         d2 = datetime.strptime(end_date, "%Y-%m-%d").date()
@@ -551,24 +553,35 @@ class FatigueEngine:
             dates = dates[:31]
             
         result = []
+        
+        # Pre-fetch ALL shifts for all employees for the entire heatmap window to avoid O(N*M) DB queries
+        w_start = (d1 - timedelta(days=14)).isoformat()
+        all_shifts_query = "SELECT * FROM shifts WHERE owner_email = %s AND shift_date >= %s AND shift_date <= %s ORDER BY shift_date, start_time"
+        all_shifts_rows = self.conn.execute(all_shifts_query, (self.owner_email, w_start, end_date)).fetchall()
+        
+        shifts_by_emp = {}
+        for row in all_shifts_rows:
+            emp_id = row["employee_id"]
+            if emp_id not in shifts_by_emp:
+                shifts_by_emp[emp_id] = []
+            shifts_by_emp[emp_id].append(dict(row))
+            
         for emp in employees:
             emp_id = emp["employee_id"]
             daily_risks = {}
-            # Base start date a bit earlier to catch streaks
-            w_start = (d1 - timedelta(days=14)).isoformat()
+            emp_shifts = shifts_by_emp.get(emp_id, [])
             
             for d in dates:
                 # Cumulative risk as of day 'd'
-                analysis = self.analyze_employee(emp_id, start_date=w_start, end_date=d)
-                # But we only want to highlight days where there IS a shift, or the risk is inherently high.
+                # Filter pre-fetched shifts up to day 'd'
+                shifts_up_to_d = [s for s in emp_shifts if s["shift_date"] <= d]
+                analysis = self.analyze_employee(emp_id, start_date=w_start, end_date=d, shifts=shifts_up_to_d, employee=dict(emp))
+                
                 # Let's see if the employee actually has a shift on day d.
-                shifts_on_day = [s for s in self.get_shifts_for_employee(emp_id, d, d) if s.get("shift_type") != "Rest Day"]
+                shifts_on_day = [s for s in emp_shifts if s["shift_date"] == d and s.get("shift_type") != "Rest Day"]
                 
                 score = analysis.get("fatigue_score", 0)
                 level = analysis.get("risk_level", "Low")
-                
-                # If no shift on this day, risk is effectively 'rest' visually unless they are in a critical cumulative state,
-                # but typically a heatmap highlights the shifts. Let's just use the score.
                 
                 daily_risks[d] = {
                     "score": score,

@@ -1183,8 +1183,16 @@ def _process_shifts_data(shifts, owner):
             # insert shift
             shift_id = s.get("shift_id") or f"S_{uuid.uuid4().hex[:8]}"
             conn.execute(
-                """INSERT OR REPLACE INTO shifts (shift_id, owner_email, employee_id, shift_date, shift_type, start_time, end_time, location, department)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                """INSERT INTO shifts (shift_id, owner_email, employee_id, shift_date, shift_type, start_time, end_time, location, department)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                   ON CONFLICT (shift_id, owner_email) DO UPDATE SET
+                       employee_id = EXCLUDED.employee_id,
+                       shift_date = EXCLUDED.shift_date,
+                       shift_type = EXCLUDED.shift_type,
+                       start_time = EXCLUDED.start_time,
+                       end_time = EXCLUDED.end_time,
+                       location = EXCLUDED.location,
+                       department = EXCLUDED.department""",
                 (shift_id, owner, emp_id, s.get("shift_date"), s.get("shift_type", "Day"), s.get("start_time"), s.get("end_time"), s.get("location"), s.get("department"))
             )
             shifts_inserted += 1
@@ -1210,8 +1218,4 @@ def server_error(e):
 
 
 if __name__ == "__main__":
-    if not os.path.exists(DB_PATH):
-        print("No database found - initializing and seeding from starter CSVs...")
-        init_db(reset=True)
-        seed_from_csv()
     app.run(debug=True, host="0.0.0.0", port=5000)

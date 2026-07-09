@@ -136,6 +136,7 @@ h2 {
     display: flex;
     gap: 2rem;
     position: relative;
+    margin-left: auto;
 }
 
 .nav-indicator {
@@ -182,7 +183,7 @@ h2 {
     display: flex;
     align-items: center;
     gap: 1rem;
-    margin-left: auto;
+    margin-left: 1.5rem;
 }
 
 #btn-account-icon {

@@ -1,30 +1,42 @@
 /* Custom Properties */
 :root {
-    /* M3 Expressive Dark Palette */
-    --bg-color: #0d0e11;
-    --surface-level-1: #1a1b20;
-    --surface-level-2: #24252b;
-    --surface-level-3: #2d2e34;
+    /* Main Dark Theme (Default) */
+    --bg-color: #0f172a;
+    --surface-level-1: #1e293b;
+    --surface-level-2: #243042;
+    --surface-level-3: #2a374a;
     --surface-hover: rgba(255, 255, 255, 0.08);
     --border-color: rgba(255, 255, 255, 0.12);
 
-    /* Text */
-    --text-primary: #e2e2e9;
-    --text-secondary: #c4c6d0;
-    --text-tertiary: #8d9199;
+    /* Text (Dark Theme) */
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-tertiary: #94a3b8;
 
-    /* Accents (M3 Primary - Vibrant Blue/Purple for Expressive) */
-    --accent-primary: #a8c7fa; 
-    --accent-primary-dim: rgba(168, 199, 250, 0.12);
-    --accent-on-primary: #062e6f;
+    /* Light Theme Defaults (for alternating sections) */
+    --bg-light: #f8fafc;
+    --surface-light: #ffffff;
+    --text-primary-light: #0f172a;
+    --text-secondary-light: #334155;
+    --border-light: #e2e8f0;
+    --surface-hover-light: rgba(0, 0, 0, 0.05);
 
-    /* Risk Tier Colors (M3 Refined) */
-    --accent-safe: #93f0a9; /* Soft Green */
-    --accent-safe-dim: rgba(147, 240, 169, 0.15);
-    --accent-caution: #f97316; /* Orange */
-    --accent-caution-dim: rgba(249, 115, 22, 0.15);
-    --accent-critical: #b91c1c; /* Dark Red */
-    --accent-critical-dim: rgba(185, 28, 28, 0.15);
+    /* Accents */
+    --accent-primary: #2563eb; 
+    --accent-primary-hover: #1d4ed8;
+    --accent-primary-dim: rgba(37, 99, 235, 0.15);
+    --accent-on-primary: #ffffff;
+    
+    --accent-secondary: #ea580c;
+    --accent-on-secondary: #ffffff;
+
+    /* Risk Tier Colors (High Contrast) */
+    --accent-safe: #16a34a; /* Bold Green */
+    --accent-safe-dim: rgba(22, 163, 74, 0.15);
+    --accent-caution: #d97706; /* Amber */
+    --accent-caution-dim: rgba(217, 119, 6, 0.15);
+    --accent-critical: #dc2626; /* Strong Red */
+    --accent-critical-dim: rgba(220, 38, 38, 0.15);
 
     /* Backwards compatibility aliases */
     --accent-green: var(--accent-safe);
@@ -338,6 +350,7 @@ h2 {
 }
 
 .btn-primary:hover {
+    background-color: var(--accent-primary-hover);
     box-shadow: var(--elevation-2);
     transform: translateY(-2px);
 }
@@ -522,6 +535,71 @@ section:not(.hero) {
     transform: translateY(-4px);
     box-shadow: var(--elevation-3);
     border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Light Section Overrides */
+.section-light {
+    background: var(--bg-light) !important;
+    color: var(--text-primary-light);
+}
+
+.section-light .card {
+    background-color: var(--surface-light);
+    border-color: var(--border-light);
+    box-shadow: var(--elevation-1);
+}
+
+.section-light .card:hover {
+    border-color: var(--accent-primary);
+    box-shadow: var(--elevation-2);
+}
+
+.section-light .text-secondary,
+.section-light p {
+    color: var(--text-secondary-light);
+}
+
+.section-light h2,
+.section-light h3,
+.section-light h4,
+.section-light h5 {
+    color: var(--text-primary-light);
+}
+
+.section-light .step-card {
+    background: var(--surface-light);
+    border-color: var(--border-light);
+    color: var(--text-primary-light);
+}
+
+.section-light .step-card:hover {
+    background: var(--surface-hover-light);
+}
+
+.section-light .step-icon {
+    background: var(--surface-light);
+    color: var(--text-primary-light);
+    border-color: var(--border-light);
+}
+
+.section-light .step-connector::after {
+    background: linear-gradient(90deg, var(--text-secondary-light), transparent);
+}
+
+.section-light .section-subtitle,
+.section-light .status-label {
+    color: var(--text-secondary-light) !important;
+}
+
+.section-light .btn-secondary {
+    background-color: var(--surface-light);
+    color: var(--text-primary-light);
+    border-color: var(--border-light);
+}
+
+.section-light .btn-secondary:hover {
+    background-color: var(--surface-hover-light);
+    border-color: var(--text-secondary-light);
 }
 
 /* About Section */

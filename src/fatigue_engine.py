@@ -239,7 +239,7 @@ class FatigueEngine:
         return flagged
 
     # ---------- composite analysis ----------
-    def analyze_employee(self, employee_id: str, start_date: str = None, end_date: str = None, shifts: list = None, employee: dict = None) -> dict:
+    def analyze_employee(self, employee_id: str, start_date: str = None, end_date: str = None, shifts: list = None, employee: dict = None, subjective_fatigue: list = None) -> dict:
         """Full fatigue-risk analysis for one employee across an optional
         date window (defaults to all shifts on file)."""
         if employee is None:
@@ -337,7 +337,10 @@ class FatigueEngine:
         # R008 - Subjective Fatigue Rating
         d = datetime.strptime(end_date or datetime.today().strftime('%Y-%m-%d'), "%Y-%m-%d").date()
         w_start = (d - timedelta(days=7)).isoformat()
-        subjective = self.get_subjective_fatigue(employee_id, w_start, d.isoformat())
+        if subjective_fatigue is None:
+            subjective = self.get_subjective_fatigue(employee_id, w_start, d.isoformat())
+        else:
+            subjective = [r for r in subjective_fatigue if w_start <= r["report_date"] <= d.isoformat()]
         recent_high = [r for r in subjective if r["fatigue_rating"] >= 5]
         for r in recent_high:
             violations.append({
@@ -571,16 +574,27 @@ class FatigueEngine:
                 shifts_by_emp[emp_id] = []
             shifts_by_emp[emp_id].append(dict(row))
             
+        subj_query = "SELECT * FROM subjective_fatigue WHERE owner_email = %s AND report_date >= %s AND report_date <= %s"
+        subj_rows = self.conn.execute(subj_query, (self.owner_email, w_start, end_date)).fetchall()
+        subj_by_emp = {}
+        for row in subj_rows:
+            emp_id = row["employee_id"]
+            if emp_id not in subj_by_emp:
+                subj_by_emp[emp_id] = []
+            subj_by_emp[emp_id].append(dict(row))
+            
         for emp in employees:
             emp_id = emp["employee_id"]
             daily_risks = {}
             emp_shifts = shifts_by_emp.get(emp_id, [])
+            emp_subj = subj_by_emp.get(emp_id, [])
             
             for d in dates:
                 # Cumulative risk as of day 'd'
                 # Filter pre-fetched shifts up to day 'd'
                 shifts_up_to_d = [s for s in emp_shifts if s["shift_date"] <= d]
-                analysis = self.analyze_employee(emp_id, start_date=w_start, end_date=d, shifts=shifts_up_to_d, employee=dict(emp))
+                subj_up_to_d = [s for s in emp_subj if s["report_date"] <= d]
+                analysis = self.analyze_employee(emp_id, start_date=w_start, end_date=d, shifts=shifts_up_to_d, employee=dict(emp), subjective_fatigue=subj_up_to_d)
                 
                 # Let's see if the employee actually has a shift on day d.
                 shifts_on_day = [s for s in emp_shifts if s["shift_date"] == d and s.get("shift_type") != "Rest Day"]

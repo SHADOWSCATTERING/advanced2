@@ -145,7 +145,7 @@ def register():
             
         conn.execute(
             """INSERT INTO users (email, password_hash, first_name, last_name, security_question, security_answer_hash)
-               VALUES (?, ?, ?, ?, ?, ?)""",
+               VALUES (%s, %s, %s, %s, %s, %s)""",
             (email, password_hash, payload["first_name"], payload["last_name"], payload["security_question"], sec_answer_hash)
         )
     return jsonify({"message": "Registration successful", "email": email}), 201
@@ -360,15 +360,15 @@ def google_callback():
                 if refresh_token:
                     conn.execute(
                         """UPDATE users SET auth_provider='google', google_id=%s,
-                           google_access_token=?, google_refresh_token=?, google_token_expiry=?
-                           WHERE email=?""",
+                           google_access_token=%s, google_refresh_token=%s, google_token_expiry=%s
+                           WHERE email=%s""",
                         (google_id, access_token, refresh_token, expiry, email),
                     )
                 else:
                     conn.execute(
                         """UPDATE users SET auth_provider='google', google_id=%s,
-                           google_access_token=?, google_token_expiry=?
-                           WHERE email=?""",
+                           google_access_token=%s, google_token_expiry=%s
+                           WHERE email=%s""",
                         (google_id, access_token, expiry, email),
                     )
             else:
@@ -381,7 +381,7 @@ def google_callback():
                        (email, password_hash, first_name, last_name, security_question,
                         security_answer_hash, auth_provider, google_id,
                         google_access_token, google_refresh_token, google_token_expiry)
-                       VALUES (?, ?, ?, ?, ?, ?, 'google', ?, ?, ?, ?)""",
+                       VALUES (%s, %s, %s, %s, %s, %s, 'google', %s, %s, %s, %s)""",
                     (email, placeholder_hash, first_name, last_name,
                      "N/A (Google account)", placeholder_hash,
                      google_id, access_token, refresh_token, expiry),
@@ -498,7 +498,7 @@ def create_employee():
             """INSERT INTO employees
                (employee_id, owner_email, name, role, department, employment_type,
                 max_weekly_hours, contracted_hours, experience_years, min_rest_hours_required)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
             (
                 payload["employee_id"], owner, payload["name"], payload.get("role"),
                 payload.get("department"), payload.get("employment_type", "Full-Time"),
@@ -534,7 +534,7 @@ def add_subjective_fatigue(emp_id):
 
         conn.execute(
             """INSERT INTO subjective_fatigue (employee_id, owner_email, report_date, fatigue_rating, notes)
-               VALUES (?, ?, ?, ?, ?)""",
+               VALUES (%s, %s, %s, %s, %s)""",
             (emp_id, owner, report_date, rating, notes)
         )
     return jsonify({"status": "ok", "message": "Fatigue rating logged"})
@@ -663,7 +663,7 @@ def create_shift():
         conn.execute(
             """INSERT INTO shifts (shift_id, owner_email, employee_id, shift_date, shift_type,
                start_time, end_time, location, department)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
             (
                 payload["shift_id"], owner, payload["employee_id"], payload["shift_date"],
                 payload.get("shift_type", "Day"), payload["start_time"], payload["end_time"],
@@ -1175,7 +1175,7 @@ def _process_shifts_data(shifts, owner):
             if not emp:
                 conn.execute(
                     """INSERT INTO employees (employee_id, owner_email, name, role, department)
-                       VALUES (?, ?, ?, ?, ?)""",
+                       VALUES (%s, %s, %s, %s, %s)""",
                     (emp_id, owner, f"User {emp_id}", "Staff", s.get("department", "General"))
                 )
                 employees_created += 1
@@ -1184,7 +1184,7 @@ def _process_shifts_data(shifts, owner):
             shift_id = s.get("shift_id") or f"S_{uuid.uuid4().hex[:8]}"
             conn.execute(
                 """INSERT OR REPLACE INTO shifts (shift_id, owner_email, employee_id, shift_date, shift_type, start_time, end_time, location, department)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 (shift_id, owner, emp_id, s.get("shift_date"), s.get("shift_type", "Day"), s.get("start_time"), s.get("end_time"), s.get("location"), s.get("department"))
             )
             shifts_inserted += 1

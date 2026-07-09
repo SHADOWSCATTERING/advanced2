@@ -106,31 +106,31 @@ class FatigueEngine:
     # ---------- data access ----------
     def get_employee(self, employee_id: str):
         row = self.conn.execute(
-            "SELECT * FROM employees WHERE employee_id = ? AND owner_email = ?", (employee_id, self.owner_email)
+            "SELECT * FROM employees WHERE employee_id = %s AND owner_email = %s", (employee_id, self.owner_email)
         ).fetchone()
         return dict(row) if row else None
 
     def get_shifts_for_employee(self, employee_id: str, start_date: str = None, end_date: str = None):
-        query = "SELECT * FROM shifts WHERE employee_id = ? AND owner_email = ?"
+        query = "SELECT * FROM shifts WHERE employee_id = %s AND owner_email = %s"
         params = [employee_id, self.owner_email]
         if start_date:
-            query += " AND shift_date >= ?"
+            query += " AND shift_date >= %s"
             params.append(start_date)
         if end_date:
-            query += " AND shift_date <= ?"
+            query += " AND shift_date <= %s"
             params.append(end_date)
         query += " ORDER BY shift_date, start_time"
         rows = self.conn.execute(query, params).fetchall()
         return [dict(r) for r in rows]
 
     def get_subjective_fatigue(self, employee_id: str, start_date: str = None, end_date: str = None):
-        query = "SELECT * FROM subjective_fatigue WHERE employee_id = ? AND owner_email = ?"
+        query = "SELECT * FROM subjective_fatigue WHERE employee_id = %s AND owner_email = %s"
         params = [employee_id, self.owner_email]
         if start_date:
-            query += " AND report_date >= ?"
+            query += " AND report_date >= %s"
             params.append(start_date)
         if end_date:
-            query += " AND report_date <= ?"
+            query += " AND report_date <= %s"
             params.append(end_date)
         query += " ORDER BY report_date"
         rows = self.conn.execute(query, params).fetchall()
@@ -516,7 +516,7 @@ class FatigueEngine:
 
     # ---------- workforce-wide dashboard ----------
     def dashboard_risk_summary(self) -> dict:
-        employees = self.conn.execute("SELECT employee_id, name FROM employees WHERE owner_email = ?", (self.owner_email,)).fetchall()
+        employees = self.conn.execute("SELECT employee_id, name FROM employees WHERE owner_email = %s", (self.owner_email,)).fetchall()
         summary = {"Low": 0, "Medium": 0, "High": 0, "Critical": 0}
         per_employee = []
         for row in employees:
@@ -540,7 +540,7 @@ class FatigueEngine:
         }
 
     def heatmap_data(self, start_date: str, end_date: str) -> dict:
-        employees = self.conn.execute("SELECT employee_id, name FROM employees WHERE owner_email = ?", (self.owner_email,)).fetchall()
+        employees = self.conn.execute("SELECT employee_id, name FROM employees WHERE owner_email = %s", (self.owner_email,)).fetchall()
         
         d1 = datetime.strptime(start_date, "%Y-%m-%d").date()
         d2 = datetime.strptime(end_date, "%Y-%m-%d").date()
@@ -589,11 +589,11 @@ class FatigueEngine:
         to minimize total fatigue risk.
         Returns the draft assignments and unassigned shifts.
         """
-        employees = self.conn.execute("SELECT * FROM employees WHERE owner_email = ?", (self.owner_email,)).fetchall()
+        employees = self.conn.execute("SELECT * FROM employees WHERE owner_email = %s", (self.owner_email,)).fetchall()
         employees = [dict(e) for e in employees]
         
         # Pre-fetch availability
-        avail_rows = self.conn.execute("SELECT * FROM availability WHERE available = 'N' AND owner_email = ?", (self.owner_email,)).fetchall()
+        avail_rows = self.conn.execute("SELECT * FROM availability WHERE available = 'N' AND owner_email = %s", (self.owner_email,)).fetchall()
         unavailable_map = {}
         for r in avail_rows:
             unavailable_map.setdefault(r["employee_id"], set()).add(r["date"])

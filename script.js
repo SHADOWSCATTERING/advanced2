@@ -857,16 +857,26 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!res.ok) throw new Error("Could not load employees");
             employeesData = await res.json();
             
+            // If they have no employees, show empty state instead of demo data
+            if (employeesData.length === 0) {
+                renderEmployeeList([]);
+                return;
+            }
+            
             // Get dashboard stats if database is initialized
-            const dashboardRes = await fetchWithTimeout(`${API_BASE}/api/dashboard/risk-summary`, { timeout: 8000 });
             let riskSummary = {};
-            if (dashboardRes.ok) {
-                riskSummary = await dashboardRes.json();
+            try {
+                const dashboardRes = await fetchWithTimeout(`${API_BASE}/api/dashboard/risk-summary`, { timeout: 10000 });
+                if (dashboardRes.ok) {
+                    riskSummary = await dashboardRes.json();
+                }
+            } catch (dashErr) {
+                console.warn("Could not load risk summary, rendering basic list:", dashErr);
             }
 
             renderEmployeeList(riskSummary.employee_risks || []);
         } catch (err) {
-            console.error("Error loading employees:", err);
+            console.error("Error loading employees from DB, falling back to demo data:", err);
             loadDemoData();
         }
     }

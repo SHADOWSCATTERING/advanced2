@@ -378,12 +378,13 @@ class FatigueEngine:
 
     # ---------- conflict pre-check for a NEW shift before it's saved ----------
     def validate_new_shift(self, employee_id: str, shift_date: str, start_time: str,
-                            end_time: str, shift_type: str = None) -> dict:
+                            end_time: str, shift_type: str = None, employee: dict = None, existing_shifts: list = None) -> dict:
         """Dry-run check: what would happen to this employee's fatigue
         profile if this shift were added? Does NOT write to the database.
         Used by POST /api/shifts/validate before a manager commits an
         assignment."""
-        employee = self.get_employee(employee_id)
+        if employee is None:
+            employee = self.get_employee(employee_id)
         if not employee:
             return {"error": f"Employee {employee_id} not found"}
 
@@ -394,10 +395,13 @@ class FatigueEngine:
         }
 
         # Look at a window around the candidate date for rest/overlap checks
-        d = datetime.strptime(shift_date, "%Y-%m-%d").date()
-        window_start = (d - timedelta(days=7)).isoformat()
-        window_end = (d + timedelta(days=7)).isoformat()
-        existing = self.get_shifts_for_employee(employee_id, window_start, window_end)
+        if existing_shifts is None:
+            d = datetime.strptime(shift_date, "%Y-%m-%d").date()
+            window_start = (d - timedelta(days=7)).isoformat()
+            window_end = (d + timedelta(days=7)).isoformat()
+            existing = self.get_shifts_for_employee(employee_id, window_start, window_end)
+        else:
+            existing = existing_shifts
 
         combined = existing + [candidate]
         analysis = self._analyze_shift_list(employee, combined)
@@ -469,12 +473,13 @@ class FatigueEngine:
     # ---------- safer-alternative suggestion (rule-based) ----------
     def suggest_safer_alternatives(self, employee_id: str, shift_date: str, start_time: str,
                                     end_time: str, shift_type: str = None, max_options: int = 3) -> list:
-        """Try a small set of rule-based alternatives (shift the start time
-        later, move the date forward, shorten the shift) and return the
-        ones that come back clean. This is intentionally simple/greedy -
+        """Find up to `max_options` alternative shift timings that result in a lower
+        overall fatigue score for this employee. This is intentionally simple/greedy -
         good enough for a capstone-level suggestion engine."""
         candidates = []
         base_date = datetime.strptime(shift_date, "%Y-%m-%d").date()
+        employee = self.get_employee(employee_id)
+        base_shifts = self.get_shifts_for_employee(employee_id)
 
         option_specs = [
             ("Push start time back by 2 hours", 0, 2, 0),
@@ -499,7 +504,7 @@ class FatigueEngine:
                 new_end_str = new_end_dt.strftime("%H:%M")
 
                 check = self.validate_new_shift(
-                    employee_id, new_date.isoformat(), new_start_str, new_end_str, shift_type
+                    employee_id, new_date.isoformat(), new_start_str, new_end_str, shift_type, employee, base_shifts
                 )
                 if check.get("safe_to_assign"):
                     candidates.append({

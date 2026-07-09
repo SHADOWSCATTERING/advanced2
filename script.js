@@ -960,7 +960,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderEmployeeDetails(riskData, scheduleData);
             
             // Asynchronously fetch AI Explanation
-            fetchAiExplanation(empId);
+            let urlAi = `${API_BASE}/api/employees/${empId}/ai-explanation`;
+            if (dateStart.value && dateEnd.value) {
+                urlAi += `?start_date=${dateStart.value}&end_date=${dateEnd.value}`;
+            }
+            fetchAiExplanation(urlAi);
         } catch (err) {
             console.error(err);
             loader.classList.add('hidden');

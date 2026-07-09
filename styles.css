@@ -428,36 +428,42 @@ h2 {
 
 .typewriter-reveal {
     position: relative;
-    display: inline-block;
-    clip-path: inset(0 100% 0 0);
-}
-
-.typewriter-reveal::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    top: 0;
-    height: 100%;
-    width: 2px;
-    background-color: var(--accent-primary);
-    opacity: 0;
+    /* Removed display: inline-block to preserve layout */
+    background: linear-gradient(to right, var(--text-primary) 0%, var(--text-primary) 100%);
+    background-size: 0% 100%;
+    background-repeat: no-repeat;
+    color: transparent;
+    -webkit-background-clip: text;
+    background-clip: text;
 }
 
 .typewriter-reveal.typing {
     animation: typing 1.5s var(--easing-emphasized) forwards;
 }
+
+/* Caret */
+.typewriter-reveal::after {
+    content: '|';
+    position: absolute;
+    right: -10px; /* Approximate position */
+    color: var(--accent-primary);
+    opacity: 0;
+    animation: none;
+}
 .typewriter-reveal.typing::after {
     animation: blink-caret 0.75s step-end infinite;
-    opacity: 1;
 }
 
+.typewriter-reveal.typed {
+    background-size: 100% 100%;
+}
 .typewriter-reveal.typed::after {
     display: none;
 }
 
 @keyframes typing {
-    from { clip-path: inset(0 100% 0 0); }
-    to { clip-path: inset(0 0 0 0); }
+    from { background-size: 0% 100%; }
+    to { background-size: 100% 100%; }
 }
 @keyframes blink-caret {
     from, to { opacity: 0; }
@@ -465,8 +471,8 @@ h2 {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .typewriter-reveal.typing { animation: none; clip-path: inset(0 0 0 0); }
-    .typewriter-reveal.typing::after { display: none; }
+    .typewriter-reveal { background-size: 100% 100%; color: var(--text-primary); -webkit-background-clip: border-box; background-clip: border-box; }
+    .typewriter-reveal::after { display: none; }
     .fade-in-up { transition: opacity 0.5s ease; transform: none; }
     .ambient-bg, .hero::before, .hero::after { animation: none; }
 }

@@ -1038,7 +1038,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             groupAiRec.classList.remove('hidden');
             detailAiRecommendation.textContent = ai.recommendation;
         } else {
-            groupAiRec.classList.add('hidden');
+            groupAiRec.classList.remove('hidden');
+            detailAiRecommendation.textContent = 'No changes needed. Continue monitoring as new shifts are added.';
         }
 
 
@@ -1744,12 +1745,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // 8. Auto Startup
+    // 8. Auto Startup — show demo employees INSTANTLY, then refresh from API
+    const DEMO_EMPLOYEES = [
+        { employee_id: "E001", name: "Jane Smith (Low Risk)", role: "Senior Nurse", department: "Emergency", employment_type: "Full-Time", max_weekly_hours: 48, contracted_hours: 40, experience_years: 10, min_rest_hours_required: 11 },
+        { employee_id: "E002", name: "Mark Brown (Low Risk)", role: "Technician", department: "ICU", employment_type: "Full-Time", max_weekly_hours: 48, contracted_hours: 40, experience_years: 5, min_rest_hours_required: 11 },
+        { employee_id: "E003", name: "John Doe (Moderate Risk)", role: "Security Officer", department: "Security", employment_type: "Full-Time", max_weekly_hours: 48, contracted_hours: 40, experience_years: 5, min_rest_hours_required: 11 },
+        { employee_id: "E004", name: "Emily White (Moderate Risk)", role: "Nurse", department: "General Ward", employment_type: "Full-Time", max_weekly_hours: 48, contracted_hours: 40, experience_years: 2, min_rest_hours_required: 11 },
+        { employee_id: "E005", name: "Robert Black (Moderate Risk)", role: "Paramedic", department: "Emergency", employment_type: "Full-Time", max_weekly_hours: 48, contracted_hours: 40, experience_years: 7, min_rest_hours_required: 11 },
+        { employee_id: "E006", name: "Lisa Green (Moderate Risk)", role: "Technician", department: "Lab", employment_type: "Full-Time", max_weekly_hours: 48, contracted_hours: 40, experience_years: 3, min_rest_hours_required: 11 },
+        { employee_id: "E007", name: "Alice Johnson (High Risk)", role: "Paramedic", department: "Emergency", employment_type: "Full-Time", max_weekly_hours: 48, contracted_hours: 36, experience_years: 8, min_rest_hours_required: 11 },
+        { employee_id: "E008", name: "Tom Clark (High Risk)", role: "Security Guard", department: "Security", employment_type: "Full-Time", max_weekly_hours: 48, contracted_hours: 40, experience_years: 4, min_rest_hours_required: 11 },
+        { employee_id: "E009", name: "Sarah Connor (Critical Risk)", role: "Charge Nurse", department: "Emergency", employment_type: "Full-Time", max_weekly_hours: 48, contracted_hours: 40, experience_years: 12, min_rest_hours_required: 11 },
+        { employee_id: "E010", name: "David Davis (Critical Risk)", role: "Supervisor", department: "Logistics", employment_type: "Full-Time", max_weekly_hours: 48, contracted_hours: 40, experience_years: 15, min_rest_hours_required: 11 },
+    ];
+
+    // Show demo employees IMMEDIATELY (no waiting)
+    employeesData = DEMO_EMPLOYEES;
+    renderEmployeeList([]);
+
+    // Then check health and refresh from API in background
     checkHealth().then(status => {
         if (status === 'initialized') {
             loadEmployees();
         } else if (status === 'missing_db') {
-            // DB is missing, prompt to setup database in the employee list container
             employeeListContainer.innerHTML = `
                 <div style="text-align: center; color: var(--text-secondary); padding: 2rem 0;">
                     <p style="margin-bottom: 15px;">Database not initialized.</p>
@@ -1760,9 +1778,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (btnInitPrompt) {
                 btnInitPrompt.addEventListener('click', seedDatabase);
             }
-        } else {
-            // Offline/timeout -> Fallback to demo mode
-            loadEmployees(true);
         }
+        // If offline, the demo employees we already rendered are still visible
     });
 });
